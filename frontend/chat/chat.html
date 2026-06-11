@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="bg">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Chat</title>
+    <link rel="stylesheet" href="chat.css" />
+  </head>
+
+  <body>
+    <div class="layout">
+      <!-- USERS -->
+      <div class="sidebar">
+        <h3>Users</h3>
+        <div id="users"></div>
+      </div>
+
+      <!-- CHAT -->
+      <div class="chat">
+        <div id="messages" class="messages"></div>
+
+        <div class="input">
+          <input id="msgInput" placeholder="Write message..." />
+          <button onclick="sendMessage()">Send</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="chat.js"></script>
+  </body>
+</html>
