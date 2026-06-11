@@ -1,15 +1,19 @@
 import { defineConfig } from "vite";
-import path from "path";
+import { resolve } from "path";
 
 export default defineConfig({
-  envDir: path.resolve(__dirname),
+  // Превръщаме пътя до frontend в абсолютен
+  root: resolve(__dirname, "frontend"),
   build: {
-    outDir: "../dist",
+    // Казваме на Vite да създаде dist директно в корена на главната папка Chat
+    outDir: resolve(__dirname, "dist"),
+    emptyOutDir: true,
     rollupOptions: {
       input: {
-        main: "index.html",
-        auth: "auth/auth.html",
-        chat: "chat/chat.html",
+        // Абсолютни пътища до всеки един от HTML файловете ти
+        main: resolve(__dirname, "frontend/index.html"),
+        auth: resolve(__dirname, "frontend/auth/auth.html"),
+        chat: resolve(__dirname, "frontend/chat/chat.html"),
       },
     },
   },
