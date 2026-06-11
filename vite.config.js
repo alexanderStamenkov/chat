@@ -1,21 +1,19 @@
 import { defineConfig } from "vite";
 
-// Този лог ще се появи в терминала на Netlify по време на билда!
-console.log("=== NETLIFY ENV DEBBUGER ===");
+console.log("=== NETLIFY ENV DEBUGGER ===");
 console.log("Netlify URL:", process.env.VITE_SUPABASE_URL);
 console.log("=============================");
 
 export default defineConfig({
-  root: "frontend",
-  envDir: "../", // Търси локалния .env една папка нагоре (в CHAT)
+  // Без root: "frontend" – оставаме в главната папка CHAT
   build: {
-    outDir: "../dist", // Създава папка dist една папка нагоре (в CHAT)
+    outDir: "dist", // Билдва директно в CHAT/dist
     emptyOutDir: true,
     rollupOptions: {
       input: {
-        main: "index.html",
-        auth: "auth/auth.html",
-        chat: "chat/chat.html",
+        main: "index.html", // Намира се в CHAT/index.html
+        auth: "frontend/auth/auth.html", // Намира се във frontend/auth/
+        chat: "frontend/chat/chat.html", // Намира се във frontend/chat/
       },
     },
   },
