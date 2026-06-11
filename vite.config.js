@@ -13,9 +13,9 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       input: {
-        main: "index.html", // Спрямо root (frontend/index.html)
-        auth: "auth/auth.html", // Спрямо root (frontend/auth/auth.html)
-        chat: "chat/chat.html", // Спрямо root (frontend/chat/chat.html)
+        main: "index.html",
+        auth: "auth/auth.html",
+        chat: "chat/chat.html",
       },
     },
   },
