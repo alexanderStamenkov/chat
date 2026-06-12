@@ -20,17 +20,24 @@
   --text: #f0f0f2;
   --text-muted: #55555f;
   --text-soft: #888894;
+  --danger: #ff6b6b;
+  --success: #4ade80;
+  --warn: #fbbf24;
+}
+
+html {
+  height: 100%;
 }
 
 body {
   font-family: "Instrument Sans", sans-serif;
   background: var(--bg);
   color: var(--text);
-  min-height: 100vh;
+  min-height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
+  padding: 20px;
   position: relative;
 }
 
@@ -48,19 +55,19 @@ body {
   opacity: 0.12;
 }
 .bg-glow-1 {
-  width: 700px;
-  height: 700px;
+  width: min(700px, 100vw);
+  height: min(700px, 100vw);
   background: var(--accent);
-  top: -300px;
-  left: -200px;
+  top: -200px;
+  left: -150px;
   animation: drift1 14s ease-in-out infinite;
 }
 .bg-glow-2 {
-  width: 500px;
-  height: 500px;
+  width: min(500px, 80vw);
+  height: min(500px, 80vw);
   background: #7060f0;
-  bottom: -200px;
-  right: -150px;
+  bottom: -150px;
+  right: -100px;
   animation: drift2 18s ease-in-out infinite;
 }
 .bg-grid {
@@ -82,14 +89,13 @@ body {
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
   opacity: 0.035;
 }
-
 @keyframes drift1 {
   0%,
   100% {
     transform: translate(0, 0);
   }
   50% {
-    transform: translate(50px, 40px);
+    transform: translate(40px, 30px);
   }
 }
 @keyframes drift2 {
@@ -98,7 +104,7 @@ body {
     transform: translate(0, 0);
   }
   50% {
-    transform: translate(-40px, -50px);
+    transform: translate(-30px, -40px);
   }
 }
 
@@ -106,23 +112,23 @@ body {
 .card {
   position: relative;
   z-index: 1;
-  width: 400px;
+  width: 100%;
+  max-width: 400px;
   background: rgba(14, 14, 16, 0.85);
   border: 1px solid var(--border);
   border-radius: 20px;
-  padding: 36px 32px 32px;
+  padding: clamp(24px, 5vw, 36px) clamp(20px, 5vw, 32px);
   backdrop-filter: blur(32px);
   -webkit-backdrop-filter: blur(32px);
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.03),
-    0 24px 64px rgba(0, 0, 0, 0.55),
-    0 0 80px rgba(200, 240, 96, 0.04);
+    0 24px 64px rgba(0, 0, 0, 0.55);
   animation: cardIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 @keyframes cardIn {
   from {
     opacity: 0;
-    transform: translateY(24px) scale(0.97);
+    transform: translateY(20px) scale(0.97);
   }
   to {
     opacity: 1;
@@ -134,7 +140,7 @@ body {
 .wordmark {
   font-family: "Syne", sans-serif;
   font-weight: 800;
-  font-size: 28px;
+  font-size: clamp(22px, 5vw, 28px);
   letter-spacing: -0.05em;
   color: var(--text);
   margin-bottom: 4px;
@@ -147,14 +153,13 @@ body {
   font-size: 13px;
   color: var(--text-muted);
   font-style: italic;
-  margin-bottom: 28px;
+  margin-bottom: 24px;
   animation: fadeUp 0.5s 0.15s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
-
 @keyframes fadeUp {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -170,12 +175,12 @@ body {
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 3px;
-  margin-bottom: 22px;
+  margin-bottom: 20px;
   animation: fadeUp 0.5s 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .tabs button {
   width: 100%;
-  padding: 8px;
+  padding: 9px;
   background: transparent;
   border: none;
   border-radius: 8px;
@@ -186,18 +191,21 @@ body {
   cursor: pointer;
   transition: all 0.2s;
   letter-spacing: 0.02em;
-  margin-top: 0;
+  margin: 0;
+  -webkit-tap-highlight-color: transparent;
 }
 .tabs button.active {
   background: var(--surface3);
   color: var(--text);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
 }
+.tabs button:hover:not(.active) {
+  color: var(--text-soft);
+}
 
 /* Form */
 .form-group {
   margin-bottom: 14px;
-  animation: fadeUp 0.5s 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .form-label {
   display: block;
@@ -211,18 +219,19 @@ body {
 }
 input {
   width: 100%;
-  padding: 11px 14px;
+  padding: 12px 14px;
   background: var(--surface2);
   border: 1px solid var(--border);
   border-radius: 10px;
   color: var(--text);
   font-family: "Instrument Sans", sans-serif;
-  font-size: 14px;
+  font-size: 15px;
   outline: none;
   transition:
     border-color 0.2s,
     box-shadow 0.2s;
-  margin: 0;
+  -webkit-appearance: none;
+  appearance: none;
 }
 input::placeholder {
   color: var(--text-muted);
@@ -235,7 +244,7 @@ input:focus {
 /* Buttons */
 button {
   width: 100%;
-  padding: 12px;
+  padding: 13px;
   background: var(--accent);
   border: none;
   border-radius: 10px;
@@ -247,18 +256,18 @@ button {
   cursor: pointer;
   transition: all 0.2s;
   margin-top: 4px;
-  animation: fadeUp 0.5s 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 button:hover {
   background: var(--accent-hover);
   transform: translateY(-1px);
-  box-shadow: 0 8px 24px rgba(200, 240, 96, 0.22);
+  box-shadow: 0 8px 24px rgba(200, 240, 96, 0.2);
 }
 button:active {
   transform: translateY(0);
 }
 
-/* Divider */
 .divider {
   display: flex;
   align-items: center;
@@ -266,7 +275,6 @@ button:active {
   margin: 18px 0;
   color: var(--text-muted);
   font-size: 12px;
-  animation: fadeUp 0.5s 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .divider::before,
 .divider::after {
@@ -276,7 +284,6 @@ button:active {
   background: var(--border);
 }
 
-/* Google btn */
 .btn-google {
   background: var(--surface2);
   border: 1px solid var(--border);
@@ -288,7 +295,6 @@ button:active {
   font-family: "Instrument Sans", sans-serif;
   font-weight: 500;
   font-size: 14px;
-  animation: fadeUp 0.5s 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .btn-google:hover {
   background: var(--surface3);
@@ -296,4 +302,133 @@ button:active {
   color: var(--text);
   transform: translateY(-1px);
   box-shadow: none;
+}
+
+/* ── Toast ── */
+.toast-container {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 9999;
+  width: calc(100% - 40px);
+  max-width: 380px;
+  pointer-events: none;
+}
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  pointer-events: all;
+  animation: toastIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+  font-size: 14px;
+}
+.toast.removing {
+  animation: toastOut 0.3s ease forwards;
+}
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes toastOut {
+  to {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.95);
+  }
+}
+.toast-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.toast-body {
+  flex: 1;
+}
+.toast-title {
+  font-family: "Syne", sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  margin-bottom: 2px;
+}
+.toast-msg {
+  color: var(--text-soft);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.toast-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  font-size: 16px;
+  line-height: 1;
+  margin: 0;
+  width: auto;
+  flex-shrink: 0;
+}
+.toast-close:hover {
+  color: var(--text);
+  background: none;
+  transform: none;
+  box-shadow: none;
+}
+
+.toast.success {
+  border-color: rgba(74, 222, 128, 0.25);
+}
+.toast.success .toast-title {
+  color: var(--success);
+}
+.toast.error {
+  border-color: rgba(255, 107, 107, 0.25);
+}
+.toast.error .toast-title {
+  color: var(--danger);
+}
+.toast.info {
+  border-color: rgba(200, 240, 96, 0.2);
+}
+.toast.info .toast-title {
+  color: var(--accent);
+}
+
+/* ── Loading state ── */
+button.loading {
+  opacity: 0.7;
+  pointer-events: none;
+  position: relative;
+}
+button.loading::after {
+  content: "";
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(0, 0, 0, 0.3);
+  border-top-color: #0a0a0b;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: translateY(-50%) rotate(360deg);
+  }
 }
