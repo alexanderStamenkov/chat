@@ -15,3 +15,5 @@ A real-time chat application built using vanilla JavaScript, HTML5, CSS3, **Vite
 ```bash
    cd Chat
 ```
+
+Link: https://merry-fairy-84e78f.netlify.app/auth/auth.html
