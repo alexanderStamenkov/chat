@@ -142,3 +142,8 @@ function subscribeToMessages() {
     )
     .subscribe();
 }
+
+window.handleLogout = async function () {
+  await sb.auth.signOut();
+  window.location.href = "../auth/auth.html";
+};

@@ -17,6 +17,12 @@ body {
   border-right: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+.footer-sidebar {
+  position: absolute;
+  bottom: 10px;
+  left: 185px;
+}
+
 .user {
   padding: 10px;
   background: #222;
