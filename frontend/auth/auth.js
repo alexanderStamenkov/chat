@@ -37,7 +37,6 @@ window.handleLogin = async function () {
 
   if (error) return alert(error.message);
 
-  // гарантира profile ред дори ако trigger-ът е пропуснал
   await sb
     .from("profiles")
     .upsert({ id: data.user.id, email: data.user.email }, { onConflict: "id" });
