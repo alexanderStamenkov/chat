@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite frontend",
-    "build": "vite build frontend",
+    "build": "vite build",
     "preview": "vite preview"
   },
   "devDependencies": {
