@@ -133,6 +133,58 @@ window.sendMessage = async function () {
   scrollToBottom();
 };
 
+// ── Image upload ──────────────────────────────────────────────
+window.handleImageUpload = async function (event) {
+  const file = event.target.files[0];
+  if (!file || !selectedUser) return;
+
+  // reset input so same file can be selected again
+  event.target.value = "";
+
+  const imgBtn = document.querySelector(".img-btn");
+  imgBtn.classList.add("loading");
+
+  const ext = file.name.split(".").pop();
+  const path = `${currentUser.id}/${Date.now()}.${ext}`;
+
+  const { error: uploadError } = await sb.storage
+    .from("chat-images")
+    .upload(path, file, { contentType: file.type });
+
+  if (uploadError) {
+    console.error(uploadError);
+    imgBtn.classList.remove("loading");
+    return;
+  }
+
+  const { data: urlData } = sb.storage.from("chat-images").getPublicUrl(path);
+
+  const imageUrl = urlData.publicUrl;
+
+  const { data, error } = await sb
+    .from("messages")
+    .insert({
+      sender_id: currentUser.id,
+      receiver_id: selectedUser,
+      content: null,
+      image_url: imageUrl,
+    })
+    .select()
+    .single();
+
+  imgBtn.classList.remove("loading");
+
+  if (error) {
+    console.error(error);
+    return;
+  }
+
+  messages.push(data);
+  renderMessages();
+  scrollToBottom();
+};
+
+// ── Render ────────────────────────────────────────────────────
 function renderMessages() {
   const container = document.getElementById("messages");
   container.innerHTML = messages
@@ -142,11 +194,16 @@ function renderMessages() {
       const ini = isMine
         ? initials(currentUser.email)
         : initials(document.getElementById("chatName")?.textContent || "");
+
+      const bubbleContent = m.image_url
+        ? `<img src="${m.image_url}" class="msg-image" onclick="openImage('${m.image_url}')" />`
+        : escapeHtml(m.content || "");
+
       return `
       <div class="msg-row ${isMine ? "mine" : ""}">
         <div class="msg-avatar" style="background:${color}22;color:${color}">${ini}</div>
         <div>
-          <div class="msg-bubble">${escapeHtml(m.content)}</div>
+          <div class="msg-bubble ${m.image_url ? "image-bubble" : ""}">${bubbleContent}</div>
           <div class="msg-time">${timeStr(m.created_at)}</div>
         </div>
       </div>
@@ -154,6 +211,10 @@ function renderMessages() {
     })
     .join("");
 }
+
+window.openImage = function (url) {
+  window.open(url, "_blank");
+};
 
 function scrollToBottom() {
   const c = document.getElementById("messages");

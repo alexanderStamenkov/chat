@@ -53,10 +53,7 @@
       <div class="chat">
         <!-- Empty state -->
         <div class="empty-state" id="emptyState">
-          <div
-            class="menu-btn-wrap"
-            style="position: absolute; top: 14px; left: 16px"
-          >
+          <div style="position: absolute; top: 14px; left: 16px">
             <button class="menu-btn" onclick="openSidebar()">
               <svg
                 width="20"
@@ -111,6 +108,37 @@
           <div class="messages" id="messages"></div>
 
           <div class="input">
+            <!-- Hidden file input -->
+            <input
+              type="file"
+              id="imageInput"
+              accept="image/*"
+              style="display: none"
+              onchange="handleImageUpload(event)"
+            />
+
+            <!-- Image upload button -->
+            <button
+              class="img-btn"
+              onclick="document.getElementById('imageInput').click()"
+              title="Прикачи снимка"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <polyline points="21 15 16 10 5 21" />
+              </svg>
+            </button>
+
             <div class="input-wrap">
               <input
                 id="msgInput"
