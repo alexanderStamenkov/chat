@@ -38,6 +38,7 @@ body {
 .layout {
   display: flex;
   height: 100vh;
+  height: 100dvh;
   position: relative;
 }
 
@@ -578,5 +579,23 @@ input#msgInput::placeholder {
   .msg-image {
     max-width: 180px;
     max-height: 220px;
+  }
+
+  .layout {
+    height: 100dvh;
+  }
+
+  .chat {
+    height: 100dvh;
+  }
+
+  #activeChat {
+    height: 100%;
+    min-height: 0;
+  }
+
+  .messages {
+    flex: 1;
+    min-height: 0;
   }
 }
