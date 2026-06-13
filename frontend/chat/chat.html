@@ -79,7 +79,13 @@
         <!-- Active chat -->
         <div
           id="activeChat"
-          style="display: none; flex-direction: column; flex: 1"
+          style="
+            display: none;
+            flex-direction: column;
+            flex: 1;
+            min-height: 0;
+            overflow: hidden;
+          "
         >
           <div class="chat-header">
             <button class="menu-btn" onclick="openSidebar()">

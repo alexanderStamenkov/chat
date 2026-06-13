@@ -519,10 +519,11 @@ input#msgInput::placeholder {
   }
 
   #activeChat {
-    height: 100dvh;
-    max-height: 100dvh;
+    flex: 1;
     min-height: 0;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
   }
 
   .messages {

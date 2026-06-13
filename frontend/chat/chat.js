@@ -126,7 +126,7 @@ window.selectUser = async function (id, email) {
 
   state.messages = data || [];
   renderMessages();
-  scrollToBottom();
+  requestAnimationFrame(() => scrollToBottom());
 };
 
 // ── Send message ──────────────────────────────────────────────
@@ -258,7 +258,7 @@ function subscribeToMessages() {
         if (state.messages.some((m) => m.id === msg.id)) return;
         state.messages.push(msg);
         renderMessages();
-        scrollToBottom();
+        requestAnimationFrame(() => scrollToBottom());
       },
     )
     .subscribe();
