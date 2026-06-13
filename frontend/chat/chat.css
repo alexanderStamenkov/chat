@@ -38,7 +38,6 @@ body {
 .layout {
   display: flex;
   height: 100vh;
-  height: 100dvh;
   position: relative;
 }
 
@@ -387,16 +386,18 @@ body {
   color: #0a0a0b;
   font-weight: 500;
   border-radius: 14px 4px 14px 14px;
+  margin-left: auto;
 }
 .msg-time {
   font-size: 10px;
-  color: var(--text-muted);
+  color: var(--text);
   padding: 0 2px;
   margin-top: 2px;
   opacity: 0.6;
 }
 .msg-row.mine .msg-time {
   text-align: right;
+  margin-left: auto;
 }
 
 /* Input */
@@ -409,6 +410,7 @@ body {
   background: rgba(10, 10, 11, 0.8);
   backdrop-filter: blur(8px);
   flex-shrink: 0;
+  position: relative;
 }
 .input-wrap {
   flex: 1;
@@ -494,7 +496,7 @@ input#msgInput::placeholder {
     transform: translateX(0);
   }
   .sidebar-overlay {
-    /* display: block; */
+    display: block;
   }
   .sidebar-overlay.visible {
     display: block;
@@ -580,22 +582,97 @@ input#msgInput::placeholder {
     max-width: 180px;
     max-height: 220px;
   }
+}
 
-  .layout {
-    height: 100dvh;
-  }
+/* ── Emoji button ── */
+#emoji-btn {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
+  transition: all 0.2s;
+  color: var(--text-muted);
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+#emoji-btn:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+  transform: none;
+  box-shadow: none;
+  background: var(--surface3);
+}
 
-  .chat {
-    height: 100dvh;
-  }
+/* ── Emoji picker container ── */
+#picker-container {
+  display: none;
+  position: absolute;
+  bottom: 70px;
+  right: 16px;
+  z-index: 200;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+#picker-container.open {
+  display: block;
+}
 
-  #activeChat {
-    height: 100%;
-    min-height: 0;
-  }
+#picker-container .picmo__picker {
+  --background-color: #18181c;
+  --secondary-background-color: #222228;
+  --border-color: rgba(255, 255, 255, 0.07);
+  --text-color: #f0f0f2;
+  --secondary-text-color: #888894;
+  --hover-background-color: #222228;
+  --focus-indicator-color: #c8f060;
+  --category-tab-active-indicator-color: #c8f060;
+  --search-background-color: #111113;
+  --search-focus-background-color: #111113;
+  --search-placeholder-color: #55555f;
+  --tag-background-color: #222228;
+  --category-name-background-color: #18181c;
+  --category-name-text-color: #55555f;
+  --scrollbar-color: #222228;
+  --scrollbar-thumb-color: #333340;
+  border-radius: 12px;
+}
+#picker-container .picmo__categoryButton {
+  color: var(--accent);
+  background: none;
+  border-color: var(--accent);
+}
+#picker-container .picmo__picker {
+  /* ... съществуващите ... */
+  --category-name-background-color: #18181c;
+  --category-name-text-color: #55555f;
+  --scrollbar-color: #222228;
+  --scrollbar-thumb-color: #333340;
+}
 
-  .messages {
-    flex: 1;
-    min-height: 0;
-  }
+/* Скрол */
+#picker-container .picmo__picker * {
+  scrollbar-color: #333340 #18181c;
+  scrollbar-width: thin;
+}
+
+#picker-container .picmo__picker *::-webkit-scrollbar {
+  width: 4px;
+}
+
+#picker-container .picmo__picker *::-webkit-scrollbar-track {
+  background: #18181c;
+}
+
+#picker-container .picmo__picker *::-webkit-scrollbar-thumb {
+  background: #333340;
+  border-radius: 2px;
 }
