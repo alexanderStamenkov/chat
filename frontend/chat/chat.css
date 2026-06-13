@@ -223,6 +223,8 @@ body {
   flex-direction: column;
   background: var(--bg);
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .chat-header {
@@ -526,7 +528,7 @@ input#msgInput::placeholder {
   .messages {
     flex: 1;
     min-height: 0;
-    overflow-y: auto;
+    overflow: hidden;
   }
 
   .input {
