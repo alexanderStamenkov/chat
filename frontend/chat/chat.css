@@ -485,6 +485,11 @@ input#msgInput::placeholder {
 
 /* ── Responsive ── */
 @media (max-width: 640px) {
+  .layout {
+    height: 100dvh;
+    overflow: hidden;
+  }
+
   .sidebar {
     position: fixed;
     top: 0;
@@ -495,20 +500,46 @@ input#msgInput::placeholder {
   .sidebar.open {
     transform: translateX(0);
   }
-  /* .sidebar-overlay {
-    display: block;
-  } */
+
   .sidebar-overlay.visible {
     display: block;
   }
+
   .menu-btn {
     display: flex;
   }
+
   .chat {
     width: 100%;
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
   }
+
+  #activeChat {
+    height: 100dvh;
+    max-height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .messages {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .input {
+    flex-shrink: 0;
+  }
+
   .msg-bubble {
     max-width: min(100%, 280px);
+  }
+
+  .msg-image {
+    max-width: 180px;
+    max-height: 220px;
   }
 }
 
@@ -575,13 +606,6 @@ input#msgInput::placeholder {
 }
 .msg-image:hover {
   opacity: 0.9;
-}
-
-@media (max-width: 640px) {
-  .msg-image {
-    max-width: 180px;
-    max-height: 220px;
-  }
 }
 
 /* ── Emoji button ── */
