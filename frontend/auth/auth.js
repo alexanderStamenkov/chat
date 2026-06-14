@@ -1,40 +1,16 @@
-import { sb } from "../shared/supabase.js";
+import {
+  getSession,
+  login,
+  register,
+  loginWithGoogle,
+  upsertProfile,
+} from "../shared/api.js";
+import { showToast } from "../shared/toast.js";
 
 let currentTab = "login";
 
-// ── Toast system ──────────────────────────────────────────────
-function showToast(type, title, msg) {
-  let container = document.getElementById("toastContainer");
-  if (!container) {
-    container = document.createElement("div");
-    container.id = "toastContainer";
-    container.className = "toast-container";
-    document.body.appendChild(container);
-  }
-
-  const icons = { success: "✓", error: "✕", info: "i" };
-  const toast = document.createElement("div");
-  toast.className = `toast ${type}`;
-  toast.innerHTML = `
-    <div class="toast-icon">${icons[type] || "i"}</div>
-    <div class="toast-body">
-      <div class="toast-title">${title}</div>
-      ${msg ? `<div class="toast-msg">${msg}</div>` : ""}
-    </div>
-    <button class="toast-close" onclick="this.closest('.toast').remove()">×</button>
-  `;
-  container.appendChild(toast);
-
-  setTimeout(() => {
-    toast.classList.add("removing");
-    setTimeout(() => toast.remove(), 300);
-  }, 4000);
-}
-
-// ── Auth ──────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", async () => {
-  const { data } = await sb.auth.getSession();
-
+  const { data } = await getSession();
   if (data.session) {
     window.location.href = "../chat/chat.html";
   }
@@ -42,16 +18,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 window.switchTab = function (tab) {
   currentTab = tab;
-
   const isLogin = tab === "login";
-
   document.getElementById("loginForm").style.display = isLogin
     ? "block"
     : "none";
   document.getElementById("registerForm").style.display = isLogin
     ? "none"
     : "block";
-
   document.getElementById("tabLogin").classList.toggle("active", isLogin);
   document.getElementById("tabRegister").classList.toggle("active", !isLogin);
 };
@@ -66,8 +39,13 @@ window.handleLogin = async function () {
     return;
   }
 
+  if (!isValidEmail(email)) {
+    showToast("error", "Невалиден имейл", "Провери формата на имейла");
+    return;
+  }
+
   btn.classList.add("loading");
-  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  const { data, error } = await login(email, password);
   btn.classList.remove("loading");
 
   if (error) {
@@ -75,9 +53,7 @@ window.handleLogin = async function () {
     return;
   }
 
-  await sb
-    .from("profiles")
-    .upsert({ id: data.user.id, email: data.user.email }, { onConflict: "id" });
+  await upsertProfile(data.user.id, data.user.email);
 
   showToast("success", "Добре дошъл!", "Влизаш в приложението...");
   setTimeout(() => {
@@ -94,13 +70,19 @@ window.handleRegister = async function () {
     showToast("error", "Грешка", "Попълни имейл и парола");
     return;
   }
+
+  if (!isValidEmail(email)) {
+    showToast("error", "Невалиден имейл", "Провери формата на имейла");
+    return;
+  }
+
   if (password.length < 6) {
     showToast("error", "Паролата е кратка", "Минимум 6 символа");
     return;
   }
 
   btn.classList.add("loading");
-  const { error } = await sb.auth.signUp({ email, password });
+  const { error } = await register(email, password);
   btn.classList.remove("loading");
 
   if (error) {
@@ -116,9 +98,12 @@ window.handleRegister = async function () {
 };
 
 window.handleOAuth = async function () {
-  const { error } = await sb.auth.signInWithOAuth({
-    provider: "google",
-    options: { redirectTo: window.location.origin + "/chat/chat.html" },
-  });
+  const { error } = await loginWithGoogle(
+    window.location.origin + "/chat/chat.html",
+  );
   if (error) showToast("error", "Грешка", error.message);
 };
+
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}

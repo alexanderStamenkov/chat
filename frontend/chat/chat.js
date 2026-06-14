@@ -1,23 +1,33 @@
 import { sb } from "../shared/supabase.js";
 import { state } from "../shared/state.js";
 import { getColor, initials, timeStr, escapeHtml } from "../shared/utils.js";
+import { showToast } from "../shared/toast.js";
+import {
+  getUser,
+  logout,
+  getProfiles,
+  getMessages,
+  sendMessage,
+  sendImageMessage,
+  uploadImage,
+  subscribeToConversation,
+  unsubscribe,
+} from "../shared/api.js";
 import { createPicker } from "picmo";
 
 // ── Emoji picker ──────────────────────────────────────────────
-let pickerInstance = null;
 let pickerVisible = false;
 
 function initEmojiPicker() {
   const container = document.getElementById("picker-container");
   const trigger = document.getElementById("emoji-btn");
 
-  pickerInstance = createPicker({ rootElement: container });
+  const picker = createPicker({ rootElement: container });
 
-  pickerInstance.addEventListener("emoji:select", (e) => {
+  picker.addEventListener("emoji:select", (e) => {
     const input = document.getElementById("msgInput");
     input.value += e.emoji;
     input.focus();
-    // togglePicker(false);
   });
 
   trigger.addEventListener("click", (e) => {
@@ -38,13 +48,45 @@ function initEmojiPicker() {
 
 function togglePicker(show) {
   pickerVisible = show;
-  const container = document.getElementById("picker-container");
-  container.classList.toggle("open", show);
+  document.getElementById("picker-container").classList.toggle("open", show);
+}
+
+// ── Typing indicator ──────────────────────────────────────────
+let typingChannel = null;
+let typingTimeout = null;
+
+function initTypingIndicator(me, other) {
+  unsubscribe(typingChannel);
+
+  const id = [me, other].sort().join("-");
+  typingChannel = sb.channel(`typing:${id}`, {
+    config: { broadcast: { self: false } },
+  });
+
+  typingChannel
+    .on("broadcast", { event: "typing" }, (payload) => {
+      if (payload.payload.userId !== other) return;
+      const isTyping = payload.payload.typing === true;
+      document.getElementById("typingIndicator").style.display = isTyping
+        ? "flex"
+        : "none";
+      if (isTyping) scrollToBottom();
+    })
+    .subscribe();
+}
+
+function trackTyping(typing) {
+  if (!typingChannel || !state.currentUser) return;
+  typingChannel.send({
+    type: "broadcast",
+    event: "typing",
+    payload: { userId: state.currentUser.id, typing },
+  });
 }
 
 // ── Init ──────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", async () => {
-  const { data } = await sb.auth.getUser();
+  const { data } = await getUser();
   if (!data.user) {
     window.location.href = "../auth/auth.html";
     return;
@@ -56,23 +98,35 @@ document.addEventListener("DOMContentLoaded", async () => {
     state.currentUser.email,
   );
 
-  document.getElementById("msgInput").addEventListener("keydown", (e) => {
+  const msgInput = document.getElementById("msgInput");
+
+  msgInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      sendMessage();
+      window.sendMessage();
     }
+  });
+
+  msgInput.addEventListener("input", () => {
+    trackTyping(true);
+    clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(() => trackTyping(false), 1500);
   });
 
   initEmojiPicker();
   loadUsers();
-  subscribeToMessages();
 });
 
 // ── Users ─────────────────────────────────────────────────────
 async function loadUsers() {
-  const { data } = await sb.from("profiles").select("*");
-  const container = document.getElementById("users");
+  const { data, error } = await getProfiles();
 
+  if (error) {
+    showToast("error", "Грешка", "Не можах да заредя потребителите");
+    return;
+  }
+
+  const container = document.getElementById("users");
   container.innerHTML = data
     .filter((u) => u.id !== state.currentUser.id)
     .map((u) => {
@@ -91,7 +145,12 @@ async function loadUsers() {
 }
 
 // ── Select user ───────────────────────────────────────────────
+let activeChannel = null;
+
 window.selectUser = async function (id, email) {
+  unsubscribe(activeChannel);
+  activeChannel = null;
+
   state.selectedUser = id;
   closeSidebar();
   togglePicker(false);
@@ -103,6 +162,7 @@ window.selectUser = async function (id, email) {
 
   document.getElementById("emptyState").style.display = "none";
   document.getElementById("activeChat").style.display = "flex";
+  document.getElementById("typingIndicator").style.display = "none";
 
   const color = getColor(id);
   const av = document.getElementById("chatAvatar");
@@ -111,22 +171,25 @@ window.selectUser = async function (id, email) {
   av.style.color = color;
   document.getElementById("chatName").textContent = email;
 
-  const { data, error } = await sb
-    .from("messages")
-    .select("*")
-    .or(
-      `and(sender_id.eq.${state.currentUser.id},receiver_id.eq.${id}),and(sender_id.eq.${id},receiver_id.eq.${state.currentUser.id})`,
-    )
-    .order("created_at");
+  const { data, error } = await getMessages(state.currentUser.id, id);
 
   if (error) {
-    console.error(error);
+    showToast("error", "Грешка", "Не можах да заредя съобщенията");
     return;
   }
 
   state.messages = data || [];
   renderMessages();
   requestAnimationFrame(() => scrollToBottom());
+
+  activeChannel = subscribeToConversation(state.currentUser.id, id, (msg) => {
+    if (state.messages.some((m) => m.id === msg.id)) return;
+    state.messages.push(msg);
+    renderMessages();
+    requestAnimationFrame(() => scrollToBottom());
+  });
+
+  initTypingIndicator(state.currentUser.id, id);
 };
 
 // ── Send message ──────────────────────────────────────────────
@@ -136,19 +199,17 @@ window.sendMessage = async function () {
   if (!content || !state.selectedUser) return;
 
   input.value = "";
+  trackTyping(false);
+  clearTimeout(typingTimeout);
 
-  const { data, error } = await sb
-    .from("messages")
-    .insert({
-      sender_id: state.currentUser.id,
-      receiver_id: state.selectedUser,
-      content,
-    })
-    .select()
-    .single();
+  const { data, error } = await sendMessage(
+    state.currentUser.id,
+    state.selectedUser,
+    content,
+  );
 
   if (error) {
-    console.error(error);
+    showToast("error", "Грешка", "Съобщението не беше изпратено");
     input.value = content;
     return;
   }
@@ -164,38 +225,35 @@ window.handleImageUpload = async function (event) {
   if (!file || !state.selectedUser) return;
 
   event.target.value = "";
+
+  if (file.size > 5 * 1024 * 1024) {
+    showToast("error", "Файлът е твърде голям", "Максимум 5MB");
+    return;
+  }
+
   const imgBtn = document.querySelector(".img-btn");
   imgBtn.classList.add("loading");
 
-  const ext = file.name.split(".").pop();
-  const path = `${state.currentUser.id}/${Date.now()}.${ext}`;
-
-  const { error: uploadError } = await sb.storage
-    .from("chat-images")
-    .upload(path, file, { contentType: file.type });
+  const { url, error: uploadError } = await uploadImage(
+    state.currentUser.id,
+    file,
+  );
 
   if (uploadError) {
-    console.error(uploadError);
+    showToast("error", "Грешка при качване", "Снимката не беше качена");
     imgBtn.classList.remove("loading");
     return;
   }
 
-  const { data: urlData } = sb.storage.from("chat-images").getPublicUrl(path);
-
-  const { data, error } = await sb
-    .from("messages")
-    .insert({
-      sender_id: state.currentUser.id,
-      receiver_id: state.selectedUser,
-      content: null,
-      image_url: urlData.publicUrl,
-    })
-    .select()
-    .single();
-
+  const { data, error } = await sendImageMessage(
+    state.currentUser.id,
+    state.selectedUser,
+    url,
+  );
   imgBtn.classList.remove("loading");
+
   if (error) {
-    console.error(error);
+    showToast("error", "Грешка", "Съобщението не беше записано");
     return;
   }
 
@@ -216,7 +274,6 @@ function renderMessages() {
       const ini = isMine
         ? initials(state.currentUser.email)
         : initials(chatName);
-
       const bubbleContent = m.image_url
         ? `<img src="${m.image_url}" class="msg-image" onclick="openImage('${m.image_url}')" />`
         : escapeHtml(m.content || "");
@@ -241,32 +298,13 @@ function scrollToBottom() {
   if (c) c.scrollTop = c.scrollHeight;
 }
 
-// ── Realtime ──────────────────────────────────────────────────
-function subscribeToMessages() {
-  sb.channel("messages")
-    .on(
-      "postgres_changes",
-      { event: "INSERT", schema: "public", table: "messages" },
-      (payload) => {
-        const msg = payload.new;
-        const isRelevant =
-          (msg.sender_id === state.currentUser.id &&
-            msg.receiver_id === state.selectedUser) ||
-          (msg.sender_id === state.selectedUser &&
-            msg.receiver_id === state.currentUser.id);
-        if (!isRelevant) return;
-        if (state.messages.some((m) => m.id === msg.id)) return;
-        state.messages.push(msg);
-        renderMessages();
-        requestAnimationFrame(() => scrollToBottom());
-      },
-    )
-    .subscribe();
-}
-
 // ── Auth ──────────────────────────────────────────────────────
 window.handleLogout = async function () {
-  await sb.auth.signOut();
+  const { error } = await logout();
+  if (error) {
+    showToast("error", "Грешка", "Не можах да те изпиша");
+    return;
+  }
   window.location.href = "../auth/auth.html";
 };
 

@@ -611,6 +611,13 @@ input#msgInput::placeholder {
   opacity: 0.9;
 }
 
+@media (max-width: 640px) {
+  .msg-image {
+    max-width: 180px;
+    max-height: 220px;
+  }
+}
+
 /* ── Emoji button ── */
 #emoji-btn {
   width: 42px;
@@ -702,4 +709,38 @@ input#msgInput::placeholder {
 #picker-container .picmo__picker *::-webkit-scrollbar-thumb {
   background: #333340;
   border-radius: 2px;
+}
+
+.typing-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 14px;
+  background: var(--surface2);
+  border-radius: 4px 14px 14px 14px;
+  width: fit-content;
+  margin: 4px 0 4px 34px;
+}
+.typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  animation: typingBounce 1.2s infinite;
+}
+.typing-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.typing-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+@keyframes typingBounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(-5px);
+  }
 }
