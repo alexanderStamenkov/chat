@@ -118,3 +118,73 @@ export function createTypingChannel(me, other) {
 export function unsubscribe(channel) {
   if (channel) sb.removeChannel(channel);
 }
+
+// ── Friendships ───────────────────────────────────────────────
+export async function getFriends(userId) {
+  return sb
+    .from("friendships")
+    .select(
+      `
+      *,
+      sender:profiles!friendships_sender_id_fkey(id, email),
+      receiver:profiles!friendships_receiver_id_fkey(id, email)
+    `,
+    )
+    .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+    .eq("status", "accepted");
+}
+
+export async function getPendingInvites(userId) {
+  return sb
+    .from("friendships")
+    .select(
+      `
+      *,
+      sender:profiles!friendships_sender_id_fkey(id, email)
+    `,
+    )
+    .eq("receiver_id", userId)
+    .eq("status", "pending");
+}
+
+export async function sendFriendRequest(senderId, receiverId) {
+  return sb
+    .from("friendships")
+    .insert({ sender_id: senderId, receiver_id: receiverId })
+    .select()
+    .single();
+}
+
+export async function respondToFriendRequest(friendshipId, status) {
+  return sb
+    .from("friendships")
+    .update({ status })
+    .eq("id", friendshipId)
+    .select()
+    .single();
+}
+
+export async function searchProfiles(email, currentUserId) {
+  return sb
+    .from("profiles")
+    .select("*")
+    .ilike("email", `%${email}%`)
+    .neq("id", currentUserId)
+    .limit(5);
+}
+
+export function subscribeToFriendRequests(userId, onRequest) {
+  return sb
+    .channel(`friend-requests:${userId}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "friendships",
+        filter: `receiver_id=eq.${userId}`,
+      },
+      (payload) => onRequest(payload.new),
+    )
+    .subscribe();
+}

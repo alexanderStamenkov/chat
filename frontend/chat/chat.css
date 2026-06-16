@@ -744,3 +744,218 @@ input#msgInput::placeholder {
     transform: translateY(-5px);
   }
 }
+
+/* ── Icon buttons ── */
+.icon-btn {
+  width: 30px;
+  height: 30px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 7px;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: all 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.icon-btn:hover {
+  color: var(--text);
+  background: var(--surface2);
+  transform: none;
+  box-shadow: none;
+}
+
+.invite-badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  background: var(--accent);
+  color: #0a0a0b;
+  font-family: "Syne", sans-serif;
+  font-weight: 700;
+  font-size: 9px;
+  min-width: 14px;
+  height: 14px;
+  border-radius: 7px;
+  padding: 0 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Add friend panel ── */
+.add-friend-panel,
+.invite-panel {
+  border-bottom: 1px solid var(--border);
+  padding: 10px 12px;
+  animation: slideDown 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.search-wrap input {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: "Instrument Sans", sans-serif;
+  font-size: 13px;
+  outline: none;
+}
+.search-wrap input:focus {
+  border-color: rgba(200, 240, 96, 0.35);
+}
+
+.search-results {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.search-result {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px;
+  border-radius: 8px;
+}
+.search-result-email {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-soft);
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.btn-add-friend {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #0a0a0b;
+  font-size: 16px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  transition: all 0.15s;
+}
+.btn-add-friend:hover {
+  background: #d9ff6e;
+  transform: none;
+  box-shadow: none;
+}
+
+.no-results,
+.no-invites,
+.no-friends {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 8px 0;
+  line-height: 1.5;
+}
+
+/* ── Invite panel ── */
+.invite-panel-title {
+  font-family: "Syne", sans-serif;
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.invite-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px;
+  border-radius: 8px;
+  margin-bottom: 4px;
+}
+.invite-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "Syne", sans-serif;
+  font-weight: 700;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.invite-email {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-soft);
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.invite-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.btn-accept,
+.btn-decline {
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  transition: all 0.15s;
+}
+.btn-accept {
+  background: rgba(200, 240, 96, 0.15);
+  color: var(--accent);
+}
+.btn-accept:hover {
+  background: rgba(200, 240, 96, 0.25);
+  transform: none;
+  box-shadow: none;
+}
+.btn-decline {
+  background: rgba(255, 107, 107, 0.1);
+  color: #ff6b6b;
+}
+.btn-decline:hover {
+  background: rgba(255, 107, 107, 0.2);
+  transform: none;
+  box-shadow: none;
+}

@@ -5,7 +5,12 @@ import { showToast } from "../shared/toast.js";
 import {
   getUser,
   logout,
-  getProfiles,
+  getFriends,
+  getPendingInvites,
+  sendFriendRequest,
+  respondToFriendRequest,
+  searchProfiles,
+  subscribeToFriendRequests,
   getMessages,
   sendMessage,
   sendImageMessage,
@@ -21,7 +26,6 @@ let pickerVisible = false;
 function initEmojiPicker() {
   const container = document.getElementById("picker-container");
   const trigger = document.getElementById("emoji-btn");
-
   const picker = createPicker({ rootElement: container });
 
   picker.addEventListener("emoji:select", (e) => {
@@ -57,7 +61,6 @@ let typingTimeout = null;
 
 function initTypingIndicator(me, other) {
   unsubscribe(typingChannel);
-
   const id = [me, other].sort().join("-");
   typingChannel = sb.channel(`typing:${id}`, {
     config: { broadcast: { self: false } },
@@ -99,14 +102,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   );
 
   const msgInput = document.getElementById("msgInput");
-
   msgInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       window.sendMessage();
     }
   });
-
   msgInput.addEventListener("input", () => {
     trackTyping(true);
     clearTimeout(typingTimeout);
@@ -114,35 +115,159 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   initEmojiPicker();
-  loadUsers();
+  loadFriends();
+  loadPendingInvites();
+  subscribeToFriendRequests(state.currentUser.id, onNewFriendRequest);
 });
 
-// ── Users ─────────────────────────────────────────────────────
-async function loadUsers() {
-  const { data, error } = await getProfiles();
-
+// ── Friends ───────────────────────────────────────────────────
+async function loadFriends() {
+  const { data, error } = await getFriends(state.currentUser.id);
   if (error) {
-    showToast("error", "Грешка", "Не можах да заредя потребителите");
+    showToast("error", "Грешка", "Не можах да заредя приятелите");
     return;
   }
 
   const container = document.getElementById("users");
+  if (!data.length) {
+    container.innerHTML = `<div class="no-friends">Нямаш приятели още.<br/>Добави някого с бутона +</div>`;
+    return;
+  }
+
   container.innerHTML = data
-    .filter((u) => u.id !== state.currentUser.id)
-    .map((u) => {
-      const color = getColor(u.id);
+    .map((f) => {
+      const friend =
+        f.sender_id === state.currentUser.id ? f.receiver : f.sender;
+      const color = getColor(friend.id);
       return `
-        <div class="user" id="user-${u.id}" onclick="selectUser('${u.id}','${u.email}')">
-          <div class="user-avatar" style="background:${color}22;color:${color}">${initials(u.email)}</div>
-          <div class="user-info">
-            <div class="user-name">${u.email}</div>
-            <div class="user-hint">Натисни за чат</div>
-          </div>
+      <div class="user" id="user-${friend.id}" onclick="selectUser('${friend.id}','${friend.email}')">
+        <div class="user-avatar" style="background:${color}22;color:${color}">${initials(friend.email)}</div>
+        <div class="user-info">
+          <div class="user-name">${friend.email}</div>
+          <div class="user-hint">Натисни за чат</div>
         </div>
-      `;
+      </div>
+    `;
     })
     .join("");
 }
+
+// ── Pending invites ───────────────────────────────────────────
+async function loadPendingInvites() {
+  const { data, error } = await getPendingInvites(state.currentUser.id);
+  if (error) return;
+
+  const badge = document.getElementById("inviteBadge");
+  badge.style.display = data.length ? "flex" : "none";
+  badge.textContent = data.length;
+
+  const list = document.getElementById("inviteList");
+  if (!data.length) {
+    list.innerHTML = `<div class="no-invites">Няма чакащи покани</div>`;
+    return;
+  }
+
+  list.innerHTML = data
+    .map(
+      (f) => `
+    <div class="invite-item">
+      <div class="invite-avatar" style="background:${getColor(f.sender.id)}22;color:${getColor(f.sender.id)}">${initials(f.sender.email)}</div>
+      <div class="invite-email">${f.sender.email}</div>
+      <div class="invite-actions">
+        <button class="btn-accept" onclick="acceptInvite('${f.id}')">✓</button>
+        <button class="btn-decline" onclick="declineInvite('${f.id}')">✕</button>
+      </div>
+    </div>
+  `,
+    )
+    .join("");
+}
+
+function onNewFriendRequest(request) {
+  showToast("info", "Нова покана!", `Получи покана за приятелство`);
+  loadPendingInvites();
+}
+
+window.acceptInvite = async function (id) {
+  const { error } = await respondToFriendRequest(id, "accepted");
+  if (error) {
+    showToast("error", "Грешка", "Не можах да приема поканата");
+    return;
+  }
+  showToast("success", "Приятел добавен!", "");
+  loadPendingInvites();
+  loadFriends();
+};
+
+window.declineInvite = async function (id) {
+  const { error } = await respondToFriendRequest(id, "declined");
+  if (error) {
+    showToast("error", "Грешка", "Не можах да откажа поканата");
+    return;
+  }
+  loadPendingInvites();
+};
+
+// ── Add friend ────────────────────────────────────────────────
+let searchTimeout = null;
+
+window.toggleAddFriend = function () {
+  const panel = document.getElementById("addFriendPanel");
+  const isOpen = panel.style.display !== "none";
+  panel.style.display = isOpen ? "none" : "block";
+  document.getElementById("invitePanel").style.display = "none";
+  if (!isOpen) document.getElementById("friendSearch").focus();
+};
+
+window.toggleInvitePanel = function () {
+  const panel = document.getElementById("invitePanel");
+  const isOpen = panel.style.display !== "none";
+  panel.style.display = isOpen ? "none" : "block";
+  document.getElementById("addFriendPanel").style.display = "none";
+};
+
+window.searchFriends = function (value) {
+  clearTimeout(searchTimeout);
+  if (!value.trim()) {
+    document.getElementById("searchResults").innerHTML = "";
+    return;
+  }
+  searchTimeout = setTimeout(() => doSearch(value), 300);
+};
+
+async function doSearch(email) {
+  const { data, error } = await searchProfiles(email, state.currentUser.id);
+  const container = document.getElementById("searchResults");
+
+  if (error || !data.length) {
+    container.innerHTML = `<div class="no-results">Няма резултати</div>`;
+    return;
+  }
+
+  container.innerHTML = data
+    .map(
+      (u) => `
+    <div class="search-result">
+      <div class="user-avatar" style="background:${getColor(u.id)}22;color:${getColor(u.id)};width:30px;height:30px;font-size:11px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:Syne,sans-serif;font-weight:700;flex-shrink:0">${initials(u.email)}</div>
+      <div class="search-result-email">${u.email}</div>
+      <button class="btn-add-friend" onclick="addFriend('${u.id}')">+</button>
+    </div>
+  `,
+    )
+    .join("");
+}
+
+window.addFriend = async function (receiverId) {
+  const { error } = await sendFriendRequest(state.currentUser.id, receiverId);
+  if (error) {
+    showToast("error", "Грешка", "Не можах да изпратя покана");
+    return;
+  }
+  showToast("success", "Поканата е изпратена!", "");
+  document.getElementById("addFriendPanel").style.display = "none";
+  document.getElementById("friendSearch").value = "";
+  document.getElementById("searchResults").innerHTML = "";
+};
 
 // ── Select user ───────────────────────────────────────────────
 let activeChannel = null;
@@ -172,7 +297,6 @@ window.selectUser = async function (id, email) {
   document.getElementById("chatName").textContent = email;
 
   const { data, error } = await getMessages(state.currentUser.id, id);
-
   if (error) {
     showToast("error", "Грешка", "Не можах да заредя съобщенията");
     return;
@@ -207,7 +331,6 @@ window.sendMessage = async function () {
     state.selectedUser,
     content,
   );
-
   if (error) {
     showToast("error", "Грешка", "Съобщението не беше изпратено");
     input.value = content;
@@ -223,7 +346,6 @@ window.sendMessage = async function () {
 window.handleImageUpload = async function (event) {
   const file = event.target.files[0];
   if (!file || !state.selectedUser) return;
-
   event.target.value = "";
 
   if (file.size > 5 * 1024 * 1024) {
@@ -238,7 +360,6 @@ window.handleImageUpload = async function (event) {
     state.currentUser.id,
     file,
   );
-
   if (uploadError) {
     showToast("error", "Грешка при качване", "Снимката не беше качена");
     imgBtn.classList.remove("loading");
@@ -251,7 +372,6 @@ window.handleImageUpload = async function (event) {
     url,
   );
   imgBtn.classList.remove("loading");
-
   if (error) {
     showToast("error", "Грешка", "Съобщението не беше записано");
     return;
