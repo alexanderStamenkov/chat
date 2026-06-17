@@ -31,7 +31,7 @@ function initEmojiPicker() {
   picker.addEventListener("emoji:select", (e) => {
     const input = document.getElementById("msgInput");
     input.value += e.emoji;
-    input.focus();
+    if (window.innerWidth > 640) input.focus();
   });
 
   trigger.addEventListener("click", (e) => {
