@@ -6,103 +6,120 @@
     <title>Чатче</title>
     <link rel="stylesheet" href="chat.css" />
     <link rel="stylesheet" href="../shared/toast.css" />
+    <link rel="stylesheet" href="../shared/profile-modal.css" />
   </head>
-
   <body>
-    <div
-      class="sidebar-overlay"
-      id="sidebarOverlay"
-      onclick="closeSidebar()"
-    ></div>
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+    <!-- ── Profile Modal ── -->
+    <div class="modal-overlay" id="profileModal" style="display:none" onclick="if(event.target===this && !state?.isFirstLogin)closeProfileSettings()">
+      <div class="modal">
+        <div class="modal-header">
+          <div>
+            <div class="modal-title">Твоят профил</div>
+            <div class="modal-subtitle">Как да те виждат другите</div>
+          </div>
+          <button class="modal-close" id="profileModalClose" onclick="closeProfileSettings()">✕</button>
+        </div>
+        <div class="modal-body">
+          <div id="firstLoginBanner" class="modal-banner" style="display:none">
+            👋 Добре дошъл! <strong>Добави снимка и име</strong><br/>за да те разпознаят приятелите ти.
+          </div>
+
+          <div class="avatar-section">
+            <div class="avatar-upload-wrap" onclick="document.getElementById('profileAvatarInput').click()">
+              <img id="profileAvatarPreview" style="display:none" />
+              <div class="avatar-upload-placeholder" id="avatarPlaceholder">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <circle cx="12" cy="8" r="4"/>
+                  <path d="M20 21a8 8 0 1 0-16 0"/>
+                </svg>
+                <span>Снимка</span>
+              </div>
+              <div class="avatar-upload-overlay">Смени</div>
+            </div>
+            <div class="avatar-hint">JPG, PNG · макс. 3MB</div>
+          </div>
+
+          <input type="file" id="profileAvatarInput" accept="image/jpeg,image/png,image/webp" style="display:none" onchange="handleAvatarChange(event)" />
+
+          <div class="modal-field">
+            <label class="form-label">Показвано име</label>
+            <input id="profileDisplayName" type="text" placeholder="напр. Иван Петров" autocomplete="off"
+              onkeydown="if(event.key==='Enter')saveProfile()" />
+          </div>
+
+          <div class="modal-actions">
+            <button class="btn-secondary" id="profileCancelBtn" onclick="closeProfileSettings()">Пропусни</button>
+            <button id="saveProfileBtn" onclick="saveProfile()">Запази →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Rename Contact Modal ── -->
+    <div class="modal-overlay" id="renameModal" style="display:none" onclick="if(event.target===this)closeRenameContact()">
+      <div class="modal modal-sm">
+        <div class="modal-header">
+          <div class="modal-title">Преименувай контакт</div>
+          <button class="modal-close" onclick="closeRenameContact()">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="modal-banner">
+            Това име ще се вижда <strong>само при теб</strong>
+          </div>
+          <div class="modal-field">
+            <label class="form-label">Ново име</label>
+            <input id="renameInput" type="text" placeholder="напр. Боби" autocomplete="off"
+              onkeydown="if(event.key==='Enter')saveContactName()" />
+          </div>
+          <div class="modal-actions">
+            <button class="btn-secondary" onclick="closeRenameContact()">Откажи</button>
+            <button onclick="saveContactName()">Запази →</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <div class="layout">
       <!-- SIDEBAR -->
       <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
           <span class="sidebar-wordmark">Чатче<span>.</span></span>
-          <div style="display: flex; gap: 6px; align-items: center">
-            <!-- Invite notification bell -->
-            <button
-              class="icon-btn"
-              id="inviteBtn"
-              onclick="toggleInvitePanel()"
-              title="Покани"
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+          <div style="display:flex;gap:6px;align-items:center">
+            <button class="icon-btn" id="inviteBtn" onclick="toggleInvitePanel()" title="Покани">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
               </svg>
-              <span
-                class="invite-badge"
-                id="inviteBadge"
-                style="display: none"
-              ></span>
+              <span class="invite-badge" id="inviteBadge" style="display:none"></span>
             </button>
-            <!-- Add friend button -->
-            <button
-              class="icon-btn"
-              onclick="toggleAddFriend()"
-              title="Добави приятел"
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                <circle cx="9" cy="7" r="4" />
-                <line x1="19" y1="8" x2="19" y2="14" />
-                <line x1="22" y1="11" x2="16" y2="11" />
+            <button class="icon-btn" onclick="toggleAddFriend()" title="Добави приятел">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <line x1="19" y1="8" x2="19" y2="14"/>
+                <line x1="22" y1="11" x2="16" y2="11"/>
               </svg>
             </button>
             <button class="logout-btn" onclick="handleLogout()" title="Изход">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <polyline points="16 17 21 12 16 7" />
-                <line x1="21" y1="12" x2="9" y2="12" />
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                <polyline points="16 17 21 12 16 7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
               </svg>
             </button>
           </div>
         </div>
 
-        <!-- Add friend panel -->
-        <div class="add-friend-panel" id="addFriendPanel" style="display: none">
+        <div class="add-friend-panel" id="addFriendPanel" style="display:none">
           <div class="search-wrap">
-            <input
-              id="friendSearch"
-              placeholder="Търси по имейл..."
-              autocomplete="off"
-              oninput="searchFriends(this.value)"
-            />
+            <input id="friendSearch" placeholder="Търси по имейл..." autocomplete="off" oninput="searchFriends(this.value)" />
           </div>
           <div id="searchResults" class="search-results"></div>
         </div>
 
-        <!-- Invite panel -->
-        <div class="invite-panel" id="invitePanel" style="display: none">
+        <div class="invite-panel" id="invitePanel" style="display:none">
           <div class="invite-panel-title">Покани</div>
           <div id="inviteList"></div>
         </div>
@@ -110,33 +127,26 @@
         <div class="sidebar-section">Приятели</div>
         <div class="users-list" id="users"></div>
 
-        <div class="sidebar-footer">
-          <div class="me-avatar" id="meAvatar">АЗ</div>
+        <div class="sidebar-footer" onclick="openProfileSettings(false)" style="cursor:pointer" title="Редактирай профил">
+          <div class="me-avatar" id="meAvatar"></div>
           <div class="me-info">
             <div class="me-email" id="meEmail">—</div>
-            <div class="me-status">Онлайн</div>
+            <div class="me-status">Редактирай профил</div>
           </div>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-muted);flex-shrink:0">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
         </div>
       </div>
 
       <!-- CHAT -->
       <div class="chat">
         <div class="empty-state" id="emptyState">
-          <div style="position: absolute; top: 14px; left: 16px">
+          <div style="position:absolute;top:14px;left:16px">
             <button class="menu-btn" onclick="openSidebar()">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <line x1="3" y1="6" x2="21" y2="6" />
-                <line x1="3" y1="12" x2="21" y2="12" />
-                <line x1="3" y1="18" x2="21" y2="18" />
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
               </svg>
             </button>
           </div>
@@ -145,100 +155,49 @@
           <div class="empty-sub">Избери приятел от менюто вляво</div>
         </div>
 
-        <div
-          id="activeChat"
-          style="
-            display: none;
-            flex-direction: column;
-            flex: 1;
-            min-height: 0;
-            overflow: hidden;
-          "
-        >
+        <div id="activeChat" style="display:none;flex-direction:column;flex:1;min-height:0;overflow:hidden;">
           <div class="chat-header">
             <button class="menu-btn" onclick="openSidebar()">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <line x1="3" y1="6" x2="21" y2="6" />
-                <line x1="3" y1="12" x2="21" y2="12" />
-                <line x1="3" y1="18" x2="21" y2="18" />
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
               </svg>
             </button>
-            <div class="chat-header-avatar" id="chatAvatar"></div>
-            <div>
+            <div id="chatHeaderAvatar"></div>
+            <div style="flex:1;min-width:0">
               <div class="chat-header-name" id="chatName">—</div>
               <div class="chat-header-sub">онлайн</div>
             </div>
+            <button class="icon-btn" onclick="openRenameContact()" title="Преименувай контакт">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+            </button>
           </div>
 
           <div class="messages" id="messages"></div>
 
-          <div
-            id="typingIndicator"
-            class="typing-indicator"
-            style="display: none"
-          >
+          <div id="typingIndicator" class="typing-indicator" style="display:none">
             <div class="typing-dot"></div>
             <div class="typing-dot"></div>
             <div class="typing-dot"></div>
           </div>
 
           <div class="input">
-            <input
-              type="file"
-              id="imageInput"
-              accept="image/*"
-              style="display: none"
-              onchange="handleImageUpload(event)"
-            />
-            <button
-              class="img-btn"
-              onclick="document.getElementById('imageInput').click()"
-              title="Прикачи снимка"
-            >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <circle cx="8.5" cy="8.5" r="1.5" />
-                <polyline points="21 15 16 10 5 21" />
+            <input type="file" id="imageInput" accept="image/*" style="display:none" onchange="handleImageUpload(event)" />
+            <button class="img-btn" onclick="document.getElementById('imageInput').click()" title="Прикачи снимка">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
               </svg>
             </button>
             <div class="input-wrap">
-              <input
-                id="msgInput"
-                placeholder="Напиши съобщение..."
-                autocomplete="off"
-              />
+              <input id="msgInput" placeholder="Напиши съобщение..." autocomplete="off" />
             </div>
             <button id="emoji-btn">😀</button>
             <div id="picker-container"></div>
             <button class="send-btn" onclick="sendMessage()">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <line x1="22" y1="2" x2="11" y2="13" />
-                <polygon points="22 2 15 22 11 13 2 9 22 2" />
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
               </svg>
             </button>
           </div>

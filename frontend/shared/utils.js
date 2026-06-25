@@ -1,11 +1,6 @@
 const COLORS = [
-  "#7b61ff",
-  "#f97316",
-  "#06b6d4",
-  "#ec4899",
-  "#f59e0b",
-  "#10b981",
-  "#6366f1",
+  "#7b61ff", "#f97316", "#06b6d4",
+  "#ec4899", "#f59e0b", "#10b981", "#6366f1",
 ];
 
 export function getColor(id) {
@@ -14,8 +9,21 @@ export function getColor(id) {
   return COLORS[h % COLORS.length];
 }
 
-export function initials(email) {
-  return email ? email.substring(0, 2).toUpperCase() : "??";
+// Поддържа: "Иван Петров" → "ИП", "ivan@mail.com" → "IV", "Иван" → "ИВ"
+export function initials(nameOrEmail) {
+  if (!nameOrEmail) return "??";
+  const str = nameOrEmail.trim();
+
+  // Ако има интервал — вземи първата буква от всяка дума
+  const parts = str.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+
+  // Ако е имейл — вземи първите две букви преди @
+  const atIdx = str.indexOf("@");
+  const base = atIdx > 0 ? str.substring(0, atIdx) : str;
+  return base.substring(0, 2).toUpperCase();
 }
 
 export function timeStr(ts) {
