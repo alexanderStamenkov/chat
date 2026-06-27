@@ -3,12 +3,26 @@ import { state } from "../shared/state.js";
 import { getColor, initials, timeStr, escapeHtml } from "../shared/utils.js";
 import { showToast } from "../shared/toast.js";
 import {
-  getUser, logout,
-  getFriends, getPendingInvites, sendFriendRequest,
-  respondToFriendRequest, searchProfiles, subscribeToFriendRequests,
-  getMessages, sendMessage, sendImageMessage,
-  uploadImage, subscribeToConversation, unsubscribe,
-  updateProfile, uploadAvatar, getContactNames, setContactName, deleteContactName,
+  getUser,
+  logout,
+  getFriends,
+  getPendingInvites,
+  sendFriendRequest,
+  respondToFriendRequest,
+  searchProfiles,
+  subscribeToFriendRequests,
+  getMessages,
+  sendMessage,
+  sendImageMessage,
+  uploadImage,
+  subscribeToConversation,
+  unsubscribe,
+  updateProfile,
+  uploadAvatar,
+  getContactNames,
+  setContactName,
+  deleteContactName,
+  createOnlineChannel,
 } from "../shared/api.js";
 import { createPicker } from "picmo";
 
@@ -54,7 +68,11 @@ function initEmojiPicker() {
   });
 
   document.addEventListener("click", (e) => {
-    if (pickerVisible && !container.contains(e.target) && e.target !== trigger) {
+    if (
+      pickerVisible &&
+      !container.contains(e.target) &&
+      e.target !== trigger
+    ) {
       togglePicker(false);
     }
   });
@@ -72,13 +90,17 @@ let typingTimeout = null;
 function initTypingIndicator(me, other) {
   unsubscribe(typingChannel);
   const id = [me, other].sort().join("-");
-  typingChannel = sb.channel(`typing:${id}`, { config: { broadcast: { self: false } } });
+  typingChannel = sb.channel(`typing:${id}`, {
+    config: { broadcast: { self: false } },
+  });
 
   typingChannel
     .on("broadcast", { event: "typing" }, (payload) => {
       if (payload.payload.userId !== other) return;
       const isTyping = payload.payload.typing === true;
-      document.getElementById("typingIndicator").style.display = isTyping ? "flex" : "none";
+      document.getElementById("typingIndicator").style.display = isTyping
+        ? "flex"
+        : "none";
       if (isTyping) scrollToBottom();
     })
     .subscribe();
@@ -86,19 +108,33 @@ function initTypingIndicator(me, other) {
 
 function trackTyping(typing) {
   if (!typingChannel || !state.currentUser) return;
-  typingChannel.send({ type: "broadcast", event: "typing", payload: { userId: state.currentUser.id, typing } });
+  typingChannel.send({
+    type: "broadcast",
+    event: "typing",
+    payload: { userId: state.currentUser.id, typing },
+  });
 }
 
 // ── Init ──────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", async () => {
   const { data } = await getUser();
-  if (!data.user) { window.location.href = "../auth/auth.html"; return; }
+  if (!data.user) {
+    window.location.href = "../auth/auth.html";
+    return;
+  }
 
   state.currentUser = data.user;
 
   // Зареди пълния профил
-  const { data: profile } = await sb.from("profiles").select("*").eq("id", data.user.id).single();
-  state.currentProfile = profile || { id: data.user.id, email: data.user.email };
+  const { data: profile } = await sb
+    .from("profiles")
+    .select("*")
+    .eq("id", data.user.id)
+    .single();
+  state.currentProfile = profile || {
+    id: data.user.id,
+    email: data.user.email,
+  };
 
   updateMeFooter();
 
@@ -109,11 +145,17 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Зареди contact names
   const { data: cn } = await getContactNames(state.currentUser.id);
-  if (cn) cn.forEach((c) => { contactNames[c.contact_id] = c.custom_name; });
+  if (cn)
+    cn.forEach((c) => {
+      contactNames[c.contact_id] = c.custom_name;
+    });
 
   const msgInput = document.getElementById("msgInput");
   msgInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); window.sendMessage(); }
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      window.sendMessage();
+    }
   });
   msgInput.addEventListener("input", () => {
     trackTyping(true);
@@ -125,6 +167,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   loadFriends();
   loadPendingInvites();
   subscribeToFriendRequests(state.currentUser.id, onNewFriendRequest);
+
+  createOnlineChannel(state.currentUser.id, (onlineIds) => {
+    state.onlineUsers = onlineIds;
+    updateOnlineStatus(onlineIds);
+  });
 });
 
 function updateMeFooter() {
@@ -140,13 +187,41 @@ function updateMeFooter() {
   }
 }
 
+function updateOnlineStatus(onlineIds) {
+  document.querySelectorAll(".user").forEach((el) => {
+    const id = el.id.replace("user-", "");
+    const hint = el.querySelector(".user-hint");
+    if (hint) {
+      hint.textContent = onlineIds.includes(id) ? "онлайн" : "офлайн";
+      hint.className = onlineIds.includes(id)
+        ? "user-hint online"
+        : "user-hint";
+    }
+  });
+
+  // Обнови header-а ако е отворен чат
+  if (state.selectedUser) {
+    const sub = document.getElementById("chatHeaderSub");
+    if (sub)
+      sub.textContent = onlineIds.includes(state.selectedUser)
+        ? "онлайн"
+        : "офлайн";
+  }
+}
+
 // ── Profile settings modal ────────────────────────────────────
 window.openProfileSettings = function (isFirstLogin = false) {
   state.isFirstLogin = isFirstLogin;
   document.getElementById("profileModal").style.display = "flex";
-  document.getElementById("firstLoginBanner").style.display = isFirstLogin ? "block" : "none";
-  document.getElementById("profileModalClose").style.display = isFirstLogin ? "none" : "flex";
-  document.getElementById("profileCancelBtn").textContent = isFirstLogin ? "Пропусни" : "Откажи";
+  document.getElementById("firstLoginBanner").style.display = isFirstLogin
+    ? "block"
+    : "none";
+  document.getElementById("profileModalClose").style.display = isFirstLogin
+    ? "none"
+    : "flex";
+  document.getElementById("profileCancelBtn").textContent = isFirstLogin
+    ? "Пропусни"
+    : "Откажи";
 
   const p = state.currentProfile;
   document.getElementById("profileDisplayName").value = p.display_name || "";
@@ -181,7 +256,9 @@ window.handleAvatarChange = function (event) {
 };
 
 window.saveProfile = async function () {
-  const displayName = document.getElementById("profileDisplayName").value.trim();
+  const displayName = document
+    .getElementById("profileDisplayName")
+    .value.trim();
   const avatarFile = document.getElementById("profileAvatarInput").files[0];
   const btn = document.getElementById("saveProfileBtn");
 
@@ -195,10 +272,17 @@ window.saveProfile = async function () {
       btn.classList.remove("loading");
       return;
     }
-    const { url, error: avatarError } = await uploadAvatar(state.currentUser.id, avatarFile);
+    const { url, error: avatarError } = await uploadAvatar(
+      state.currentUser.id,
+      avatarFile,
+    );
     if (avatarError) {
       console.error("Avatar upload error:", avatarError);
-      showToast("error", "Грешка при качване", avatarError.message || "Провери правата на bucket-а");
+      showToast(
+        "error",
+        "Грешка при качване",
+        avatarError.message || "Провери правата на bucket-а",
+      );
       btn.classList.remove("loading");
       return;
     }
@@ -212,9 +296,16 @@ window.saveProfile = async function () {
 
   btn.classList.remove("loading");
 
-  if (error) { showToast("error", "Грешка", "Профилът не беше запазен"); return; }
+  if (error) {
+    showToast("error", "Грешка", "Профилът не беше запазен");
+    return;
+  }
 
-  state.currentProfile = { ...state.currentProfile, display_name: displayName || null, avatar_url: avatarUrl };
+  state.currentProfile = {
+    ...state.currentProfile,
+    display_name: displayName || null,
+    avatar_url: avatarUrl,
+  };
   updateMeFooter();
   showToast("success", "Профилът е запазен!", "");
   closeProfileSettings();
@@ -242,15 +333,24 @@ window.saveContactName = async function () {
     await deleteContactName(state.currentUser.id, state.selectedUser);
     delete contactNames[state.selectedUser];
   } else {
-    const { error } = await setContactName(state.currentUser.id, state.selectedUser, name);
-    if (error) { showToast("error", "Грешка", "Не можах да запазя името"); return; }
+    const { error } = await setContactName(
+      state.currentUser.id,
+      state.selectedUser,
+      name,
+    );
+    if (error) {
+      showToast("error", "Грешка", "Не можах да запазя името");
+      return;
+    }
     contactNames[state.selectedUser] = name;
   }
 
   // Обнови header-а
-  const chatName = contactNames[state.selectedUser] ||
+  const chatName =
+    contactNames[state.selectedUser] ||
     state.currentFriendProfile?.display_name ||
-    state.currentFriendProfile?.email || "";
+    state.currentFriendProfile?.email ||
+    "";
   document.getElementById("chatName").textContent = chatName;
 
   closeRenameContact();
@@ -261,7 +361,10 @@ window.saveContactName = async function () {
 // ── Friends ───────────────────────────────────────────────────
 async function loadFriends() {
   const { data, error } = await getFriends(state.currentUser.id);
-  if (error) { showToast("error", "Грешка", "Не можах да заредя приятелите"); return; }
+  if (error) {
+    showToast("error", "Грешка", "Не можах да заредя приятелите");
+    return;
+  }
 
   const container = document.getElementById("users");
   if (!data.length) {
@@ -269,10 +372,12 @@ async function loadFriends() {
     return;
   }
 
-  container.innerHTML = data.map((f) => {
-    const friend = f.sender_id === state.currentUser.id ? f.receiver : f.sender;
-    const name = getDisplayName(friend);
-    return `
+  container.innerHTML = data
+    .map((f) => {
+      const friend =
+        f.sender_id === state.currentUser.id ? f.receiver : f.sender;
+      const name = getDisplayName(friend);
+      return `
       <div class="user" id="user-${friend.id}" onclick="selectUser('${friend.id}')">
         ${renderAvatar(friend, 34)}
         <div class="user-info">
@@ -281,7 +386,9 @@ async function loadFriends() {
         </div>
       </div>
     `;
-  }).join("");
+    })
+    .join("");
+  if (state.onlineUsers) updateOnlineStatus(state.onlineUsers);
 }
 
 // ── Pending invites ───────────────────────────────────────────
@@ -294,9 +401,14 @@ async function loadPendingInvites() {
   badge.textContent = data.length;
 
   const list = document.getElementById("inviteList");
-  if (!data.length) { list.innerHTML = `<div class="no-invites">Няма чакащи покани</div>`; return; }
+  if (!data.length) {
+    list.innerHTML = `<div class="no-invites">Няма чакащи покани</div>`;
+    return;
+  }
 
-  list.innerHTML = data.map((f) => `
+  list.innerHTML = data
+    .map(
+      (f) => `
     <div class="invite-item">
       ${renderAvatar(f.sender, 30)}
       <div class="invite-email">${escapeHtml(f.sender.display_name || f.sender.email)}</div>
@@ -305,7 +417,9 @@ async function loadPendingInvites() {
         <button class="btn-decline" onclick="declineInvite('${f.id}')">✕</button>
       </div>
     </div>
-  `).join("");
+  `,
+    )
+    .join("");
 }
 
 function onNewFriendRequest() {
@@ -315,7 +429,10 @@ function onNewFriendRequest() {
 
 window.acceptInvite = async function (id) {
   const { error } = await respondToFriendRequest(id, "accepted");
-  if (error) { showToast("error", "Грешка", "Не можах да приема поканата"); return; }
+  if (error) {
+    showToast("error", "Грешка", "Не можах да приема поканата");
+    return;
+  }
   showToast("success", "Приятел добавен!", "");
   loadPendingInvites();
   loadFriends();
@@ -323,7 +440,10 @@ window.acceptInvite = async function (id) {
 
 window.declineInvite = async function (id) {
   const { error } = await respondToFriendRequest(id, "declined");
-  if (error) { showToast("error", "Грешка", "Не можах да откажа поканата"); return; }
+  if (error) {
+    showToast("error", "Грешка", "Не можах да откажа поканата");
+    return;
+  }
   loadPendingInvites();
 };
 
@@ -347,27 +467,40 @@ window.toggleInvitePanel = function () {
 
 window.searchFriends = function (value) {
   clearTimeout(searchTimeout);
-  if (!value.trim()) { document.getElementById("searchResults").innerHTML = ""; return; }
+  if (!value.trim()) {
+    document.getElementById("searchResults").innerHTML = "";
+    return;
+  }
   searchTimeout = setTimeout(() => doSearch(value), 300);
 };
 
 async function doSearch(email) {
   const { data, error } = await searchProfiles(email, state.currentUser.id);
   const container = document.getElementById("searchResults");
-  if (error || !data.length) { container.innerHTML = `<div class="no-results">Няма резултати</div>`; return; }
+  if (error || !data.length) {
+    container.innerHTML = `<div class="no-results">Няма резултати</div>`;
+    return;
+  }
 
-  container.innerHTML = data.map((u) => `
+  container.innerHTML = data
+    .map(
+      (u) => `
     <div class="search-result">
       ${renderAvatar(u, 30)}
       <div class="search-result-email">${escapeHtml(u.display_name || u.email)}</div>
       <button class="btn-add-friend" onclick="addFriend('${u.id}')">+</button>
     </div>
-  `).join("");
+  `,
+    )
+    .join("");
 }
 
 window.addFriend = async function (receiverId) {
   const { error } = await sendFriendRequest(state.currentUser.id, receiverId);
-  if (error) { showToast("error", "Грешка", "Не можах да изпратя покана"); return; }
+  if (error) {
+    showToast("error", "Грешка", "Не можах да изпратя покана");
+    return;
+  }
   showToast("success", "Поканата е изпратена!", "");
   document.getElementById("addFriendPanel").style.display = "none";
   document.getElementById("friendSearch").value = "";
@@ -385,7 +518,9 @@ window.selectUser = async function (id) {
   closeSidebar();
   togglePicker(false);
 
-  document.querySelectorAll(".user").forEach((el) => el.classList.remove("active"));
+  document
+    .querySelectorAll(".user")
+    .forEach((el) => el.classList.remove("active"));
   document.getElementById(`user-${id}`)?.classList.add("active");
 
   document.getElementById("emptyState").style.display = "none";
@@ -394,11 +529,13 @@ window.selectUser = async function (id) {
 
   // Намери профила на приятеля
   const { data: friendData } = await getFriends(state.currentUser.id);
-  const friendship = friendData?.find((f) =>
-    (f.sender_id === id || f.receiver_id === id)
+  const friendship = friendData?.find(
+    (f) => f.sender_id === id || f.receiver_id === id,
   );
   const friendProfile = friendship
-    ? (friendship.sender_id === state.currentUser.id ? friendship.receiver : friendship.sender)
+    ? friendship.sender_id === state.currentUser.id
+      ? friendship.receiver
+      : friendship.sender
     : { id, email: "" };
 
   state.currentFriendProfile = friendProfile;
@@ -411,7 +548,10 @@ window.selectUser = async function (id) {
   headerAvatarEl.innerHTML = renderAvatar(friendProfile, 34);
 
   const { data, error } = await getMessages(state.currentUser.id, id);
-  if (error) { showToast("error", "Грешка", "Не можах да заредя съобщенията"); return; }
+  if (error) {
+    showToast("error", "Грешка", "Не можах да заредя съобщенията");
+    return;
+  }
 
   state.messages = data || [];
   renderMessages();
@@ -437,8 +577,16 @@ window.sendMessage = async function () {
   trackTyping(false);
   clearTimeout(typingTimeout);
 
-  const { data, error } = await sendMessage(state.currentUser.id, state.selectedUser, content);
-  if (error) { showToast("error", "Грешка", "Съобщението не беше изпратено"); input.value = content; return; }
+  const { data, error } = await sendMessage(
+    state.currentUser.id,
+    state.selectedUser,
+    content,
+  );
+  if (error) {
+    showToast("error", "Грешка", "Съобщението не беше изпратено");
+    input.value = content;
+    return;
+  }
 
   state.messages.push(data);
   renderMessages();
@@ -451,17 +599,34 @@ window.handleImageUpload = async function (event) {
   if (!file || !state.selectedUser) return;
   event.target.value = "";
 
-  if (file.size > 5 * 1024 * 1024) { showToast("error", "Файлът е твърде голям", "Максимум 5MB"); return; }
+  if (file.size > 5 * 1024 * 1024) {
+    showToast("error", "Файлът е твърде голям", "Максимум 5MB");
+    return;
+  }
 
   const imgBtn = document.querySelector(".img-btn");
   imgBtn.classList.add("loading");
 
-  const { url, error: uploadError } = await uploadImage(state.currentUser.id, file);
-  if (uploadError) { showToast("error", "Грешка при качване", "Снимката не беше качена"); imgBtn.classList.remove("loading"); return; }
+  const { url, error: uploadError } = await uploadImage(
+    state.currentUser.id,
+    file,
+  );
+  if (uploadError) {
+    showToast("error", "Грешка при качване", "Снимката не беше качена");
+    imgBtn.classList.remove("loading");
+    return;
+  }
 
-  const { data, error } = await sendImageMessage(state.currentUser.id, state.selectedUser, url);
+  const { data, error } = await sendImageMessage(
+    state.currentUser.id,
+    state.selectedUser,
+    url,
+  );
   imgBtn.classList.remove("loading");
-  if (error) { showToast("error", "Грешка", "Съобщението не беше записано"); return; }
+  if (error) {
+    showToast("error", "Грешка", "Съобщението не беше записано");
+    return;
+  }
 
   state.messages.push(data);
   renderMessages();
@@ -474,23 +639,24 @@ function renderMessages() {
   const me = state.currentProfile;
   const friend = state.currentFriendProfile;
 
-  container.innerHTML = state.messages.map((m) => {
-    const isMine = m.sender_id === state.currentUser.id;
-    const profile = isMine ? me : friend;
-    const color = isMine ? "var(--accent)" : getColor(m.sender_id);
-    const name = isMine
-      ? (me.display_name || me.email)
-      : getDisplayName(friend || { id: m.sender_id, email: "" });
+  container.innerHTML = state.messages
+    .map((m) => {
+      const isMine = m.sender_id === state.currentUser.id;
+      const profile = isMine ? me : friend;
+      const color = isMine ? "var(--accent)" : getColor(m.sender_id);
+      const name = isMine
+        ? me.display_name || me.email
+        : getDisplayName(friend || { id: m.sender_id, email: "" });
 
-    const avatarHtml = profile?.avatar_url
-      ? `<img src="${profile.avatar_url}" style="width:26px;height:26px;border-radius:50%;object-fit:cover;flex-shrink:0;opacity:0.8;align-self:flex-end" />`
-      : `<div class="msg-avatar" style="background:${color}22;color:${color}">${initials(name)}</div>`;
+      const avatarHtml = profile?.avatar_url
+        ? `<img src="${profile.avatar_url}" style="width:26px;height:26px;border-radius:50%;object-fit:cover;flex-shrink:0;opacity:0.8;align-self:flex-end" />`
+        : `<div class="msg-avatar" style="background:${color}22;color:${color}">${initials(name)}</div>`;
 
-    const bubbleContent = m.image_url
-      ? `<img src="${m.image_url}" class="msg-image" onclick="openImage('${m.image_url}')" />`
-      : escapeHtml(m.content || "");
+      const bubbleContent = m.image_url
+        ? `<img src="${m.image_url}" class="msg-image" onclick="openImage('${m.image_url}')" />`
+        : escapeHtml(m.content || "");
 
-    return `
+      return `
       <div class="msg-row ${isMine ? "mine" : ""}">
         ${avatarHtml}
         <div>
@@ -499,7 +665,8 @@ function renderMessages() {
         </div>
       </div>
     `;
-  }).join("");
+    })
+    .join("");
 }
 
 window.openImage = (url) => window.open(url, "_blank");
@@ -512,7 +679,10 @@ function scrollToBottom() {
 // ── Auth ──────────────────────────────────────────────────────
 window.handleLogout = async function () {
   const { error } = await logout();
-  if (error) { showToast("error", "Грешка", "Не можах да те изпиша"); return; }
+  if (error) {
+    showToast("error", "Грешка", "Не можах да те изпиша");
+    return;
+  }
   window.location.href = "../auth/auth.html";
 };
 

@@ -977,3 +977,18 @@ input#msgInput::placeholder {
   transform: none;
   box-shadow: none;
 }
+
+.user-hint.online {
+  color: #4ade80;
+}
+
+.user-hint.online::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4ade80;
+  margin-right: 5px;
+  box-shadow: 0 0 6px rgba(74, 222, 128, 0.5);
+}

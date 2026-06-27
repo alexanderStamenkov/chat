@@ -36,17 +36,16 @@ export async function uploadAvatar(userId, file) {
 
 // ── Contact names ─────────────────────────────────────────────
 export async function getContactNames(ownerId) {
-  return sb
-    .from("contact_names")
-    .select("*")
-    .eq("owner_id", ownerId);
+  return sb.from("contact_names").select("*").eq("owner_id", ownerId);
 }
 
 export async function setContactName(ownerId, contactId, customName) {
   return sb
     .from("contact_names")
-    .upsert({ owner_id: ownerId, contact_id: contactId, custom_name: customName },
-      { onConflict: "owner_id,contact_id" })
+    .upsert(
+      { owner_id: ownerId, contact_id: contactId, custom_name: customName },
+      { onConflict: "owner_id,contact_id" },
+    )
     .select()
     .single();
 }
@@ -64,7 +63,9 @@ export async function getMessages(me, other) {
   return sb
     .from("messages")
     .select("*")
-    .or(`and(sender_id.eq.${me},receiver_id.eq.${other}),and(sender_id.eq.${other},receiver_id.eq.${me})`)
+    .or(
+      `and(sender_id.eq.${me},receiver_id.eq.${other}),and(sender_id.eq.${other},receiver_id.eq.${me})`,
+    )
     .order("created_at");
 }
 
@@ -79,7 +80,12 @@ export async function sendMessage(senderId, receiverId, content) {
 export async function sendImageMessage(senderId, receiverId, imageUrl) {
   return sb
     .from("messages")
-    .insert({ sender_id: senderId, receiver_id: receiverId, content: null, image_url: imageUrl })
+    .insert({
+      sender_id: senderId,
+      receiver_id: receiverId,
+      content: null,
+      image_url: imageUrl,
+    })
     .select()
     .single();
 }
@@ -109,7 +115,10 @@ export async function register(email, password) {
 }
 
 export async function loginWithGoogle(redirectTo) {
-  return sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo } });
+  return sb.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo },
+  });
 }
 
 export async function logout() {
@@ -128,15 +137,22 @@ export async function getUser() {
 export function subscribeToConversation(me, other, onMessage) {
   return sb
     .channel(`conversation:${[me, other].sort().join("-")}`)
-    .on("postgres_changes",
-      { event: "INSERT", schema: "public", table: "messages", filter: `sender_id=eq.${other}` },
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "messages",
+        filter: `sender_id=eq.${other}`,
+      },
       (payload) => {
         const msg = payload.new;
         const isRelevant =
           (msg.sender_id === me && msg.receiver_id === other) ||
           (msg.sender_id === other && msg.receiver_id === me);
         if (isRelevant) onMessage(msg);
-      })
+      },
+    )
     .subscribe();
 }
 
@@ -148,11 +164,13 @@ export function unsubscribe(channel) {
 export async function getFriends(userId) {
   return sb
     .from("friendships")
-    .select(`
+    .select(
+      `
       *,
       sender:profiles!friendships_sender_id_fkey(id, email, display_name, avatar_url),
       receiver:profiles!friendships_receiver_id_fkey(id, email, display_name, avatar_url)
-    `)
+    `,
+    )
     .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
     .eq("status", "accepted");
 }
@@ -160,10 +178,12 @@ export async function getFriends(userId) {
 export async function getPendingInvites(userId) {
   return sb
     .from("friendships")
-    .select(`
+    .select(
+      `
       *,
       sender:profiles!friendships_sender_id_fkey(id, email, display_name, avatar_url)
-    `)
+    `,
+    )
     .eq("receiver_id", userId)
     .eq("status", "pending");
 }
@@ -197,8 +217,33 @@ export async function searchProfiles(email, currentUserId) {
 export function subscribeToFriendRequests(userId, onRequest) {
   return sb
     .channel(`friend-requests:${userId}`)
-    .on("postgres_changes",
-      { event: "INSERT", schema: "public", table: "friendships", filter: `receiver_id=eq.${userId}` },
-      (payload) => onRequest(payload.new))
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "friendships",
+        filter: `receiver_id=eq.${userId}`,
+      },
+      (payload) => onRequest(payload.new),
+    )
     .subscribe();
+}
+
+export function createOnlineChannel(userId, onStatusChange) {
+  const channel = sb.channel("online-users", {
+    config: { presence: { key: userId } },
+  });
+
+  channel
+    .on("presence", { event: "sync" }, () => {
+      const state = channel.presenceState();
+      const onlineIds = Object.keys(state);
+      onStatusChange(onlineIds);
+    })
+    .subscribe(async () => {
+      await channel.track({ userId, online: true });
+    });
+
+  return channel;
 }
