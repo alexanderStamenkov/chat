@@ -411,5 +411,10 @@
     </div>
 
     <script type="module" src="chat.js"></script>
+    <script>
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("/frontend/sw.js");
+      }
+    </script>
   </body>
 </html>

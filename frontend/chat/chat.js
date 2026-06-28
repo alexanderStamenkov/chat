@@ -172,6 +172,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     state.onlineUsers = onlineIds;
     updateOnlineStatus(onlineIds);
   });
+
+  if ("Notification" in window) {
+    Notification.requestPermission();
+  }
 });
 
 function updateMeFooter() {
@@ -562,6 +566,33 @@ window.selectUser = async function (id) {
     state.messages.push(msg);
     renderMessages();
     requestAnimationFrame(() => scrollToBottom());
+    // Client-side fallback (tab is hidden)
+    if (document.hidden) {
+      // If SW controls the page, send a message so the SW can show
+      // a notification even when the page is not in foreground.
+      try {
+        if (navigator.serviceWorker?.controller) {
+          navigator.serviceWorker.controller.postMessage({
+            type: "CHAT_NOTIFICATION",
+            payload: {
+              title: "Ново съобщение",
+              body: msg.content || "Снимка",
+              icon: "/icon.png",
+              tag: `chat-${state.currentUser.id}-${other}`,
+              data: { from: msg.sender_id, convWith: other },
+            },
+          });
+          return;
+        }
+      } catch (e) {
+        // ignore and fallback below
+      }
+
+      new Notification("Ново съобщение", {
+        body: msg.content || "Снимка",
+        icon: "/icon.png",
+      });
+    }
   });
 
   initTypingIndicator(state.currentUser.id, id);

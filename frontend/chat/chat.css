@@ -369,7 +369,7 @@ body {
 }
 
 .msg-bubble {
-  max-width: min(68%, 320px);
+  max-width: min(100%, 320px);
   padding: 9px 13px;
   border-radius: 14px;
   font-size: 14px;
@@ -506,7 +506,7 @@ input#msgInput::placeholder {
     width: 100%;
   }
   .msg-bubble {
-    max-width: min(80%, 280px);
+    max-width: min(100%, 280px);
   }
 }
 
