@@ -66,6 +66,7 @@ export async function getMessages(me, other) {
     .or(
       `and(sender_id.eq.${me},receiver_id.eq.${other}),and(sender_id.eq.${other},receiver_id.eq.${me})`,
     )
+    .is("deleted_at", null)
     .order("created_at");
 }
 
@@ -86,6 +87,17 @@ export async function sendImageMessage(senderId, receiverId, imageUrl) {
       content: null,
       image_url: imageUrl,
     })
+    .select()
+    .single();
+}
+
+// ── Delete message (меко изтриване) ───────────────────────────
+export async function deleteMessage(messageId, userId) {
+  return sb
+    .from("messages")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", messageId)
+    .eq("sender_id", userId) // само авторът
     .select()
     .single();
 }

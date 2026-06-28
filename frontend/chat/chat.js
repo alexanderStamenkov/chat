@@ -23,11 +23,12 @@ import {
   setContactName,
   deleteContactName,
   createOnlineChannel,
+  deleteMessage,
 } from "../shared/api.js";
 import { createPicker } from "picmo";
 
 // ── Contact names cache ───────────────────────────────────────
-let contactNames = {}; // { contactId: customName }
+let contactNames = {};
 
 function getDisplayName(profile) {
   // Приоритет: локален псевдоним → display_name → email
@@ -172,7 +173,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     state.onlineUsers = onlineIds;
     updateOnlineStatus(onlineIds);
   });
+
+  // ── Настройка за дълго натискане (мобилни) ────────────────
+  setupLongPress();
 });
+
+// ── Останалите функции (без промени) ──────────────────────────
 
 function updateMeFooter() {
   const p = state.currentProfile;
@@ -656,13 +662,21 @@ function renderMessages() {
         ? `<img src="${m.image_url}" class="msg-image" onclick="openImage('${m.image_url}')" />`
         : escapeHtml(m.content || "");
 
+      // ⬇️ Бутон с 3 точки (само за моите съобщения)
+      const menuButton = isMine
+        ? `<button class="msg-menu-btn" data-msg-id="${m.id}" onclick="event.stopPropagation(); toggleMessageMenu(event, '${m.id}')">⋮</button>`
+        : "";
+
       return `
-      <div class="msg-row ${isMine ? "mine" : ""}">
+      <div class="msg-row ${isMine ? "mine" : ""}" data-msg-id="${m.id}">
         ${avatarHtml}
-        <div>
-          <div class="msg-bubble ${m.image_url ? "image-bubble" : ""}">${bubbleContent}</div>
+        <div class="msg-content-wrapper">
+          <div class="msg-bubble ${m.image_url ? "image-bubble" : ""}">
+            ${bubbleContent}
+          </div>
           <div class="msg-time">${timeStr(m.created_at)}</div>
         </div>
+        ${menuButton}
       </div>
     `;
     })
@@ -695,3 +709,117 @@ window.closeSidebar = function () {
   document.getElementById("sidebar").classList.remove("open");
   document.getElementById("sidebarOverlay").classList.remove("visible");
 };
+
+// ═══════════════════════════════════════════════════════════
+// ── НОВИ ФУНКЦИИ ЗА МЕНЮ И ИЗТРИВАНЕ ──────────────────────
+// ═══════════════════════════════════════════════════════════
+
+let activeDropdown = null;
+
+window.toggleMessageMenu = function (event, messageId) {
+  event.stopPropagation();
+
+  if (activeDropdown) {
+    activeDropdown.classList.remove("open");
+    activeDropdown.remove();
+    activeDropdown = null;
+  }
+
+  const row = event.target.closest(".msg-row");
+  if (!row) return;
+
+  const dropdown = document.createElement("div");
+  dropdown.className = "msg-dropdown open";
+  dropdown.innerHTML = `
+    <button class="msg-dropdown-item danger" onclick="confirmDeleteMessage('${messageId}')">
+      🗑️ Изтрий
+    </button>
+  `;
+
+  const btn = event.target;
+  const rect = btn.getBoundingClientRect();
+  dropdown.style.left = `${rect.left - 100}px`;
+  dropdown.style.top = `${rect.bottom + 6}px`;
+  document.body.appendChild(dropdown);
+  activeDropdown = dropdown;
+
+  setTimeout(() => {
+    document.addEventListener("click", closeDropdown, { once: true });
+  }, 10);
+};
+
+function closeDropdown() {
+  if (activeDropdown) {
+    activeDropdown.classList.remove("open");
+    setTimeout(() => {
+      if (activeDropdown) {
+        activeDropdown.remove();
+        activeDropdown = null;
+      }
+    }, 150);
+  }
+}
+
+window.confirmDeleteMessage = async function (messageId) {
+  closeDropdown();
+
+  const confirmed = confirm(
+    "Сигурен ли си, че искаш да изтриеш това съобщение?",
+  );
+  if (!confirmed) return;
+
+  try {
+    const { data, error } = await deleteMessage(
+      messageId,
+      state.currentUser.id,
+    );
+    if (error) {
+      showToast("error", "Грешка", "Не можах да изтрия съобщението");
+      return;
+    }
+
+    state.messages = state.messages.filter((m) => m.id !== messageId);
+    renderMessages();
+    showToast("success", "Изтрито", "Съобщението беше изтрито");
+  } catch (err) {
+    console.error("Delete error:", err);
+    showToast("error", "Грешка", "Възникна проблем при изтриването");
+  }
+};
+
+// ── Long press за мобилни ─────────────────────────────────────
+let longPressTimer = null;
+let longPressTriggered = false;
+
+function setupLongPress() {
+  const container = document.getElementById("messages");
+  if (!container) return;
+
+  container.addEventListener("touchstart", (e) => {
+    const row = e.target.closest(".msg-row");
+    if (!row) return;
+    const msgId = row.dataset.msgId;
+    if (!msgId) return;
+
+    const msg = state.messages.find((m) => m.id === msgId);
+    if (!msg || msg.sender_id !== state.currentUser.id) return;
+
+    longPressTriggered = false;
+    longPressTimer = setTimeout(() => {
+      longPressTriggered = true;
+      const btn = row.querySelector(".msg-menu-btn");
+      if (btn) {
+        btn.click();
+      } else {
+        confirmDeleteMessage(msgId);
+      }
+    }, 600);
+  });
+
+  container.addEventListener("touchend", () => {
+    clearTimeout(longPressTimer);
+  });
+  container.addEventListener("touchmove", () => {
+    clearTimeout(longPressTimer);
+  });
+}

@@ -493,9 +493,9 @@ input#msgInput::placeholder {
   .sidebar.open {
     transform: translateX(0);
   }
-  .sidebar-overlay {
+  /* .sidebar-overlay {
     display: block;
-  }
+  } */
   .sidebar-overlay.visible {
     display: block;
   }
@@ -991,4 +991,82 @@ input#msgInput::placeholder {
   background: #4ade80;
   margin-right: 5px;
   box-shadow: 0 0 6px rgba(74, 222, 128, 0.5);
+}
+
+/* ── Message menu (3 dots) ── */
+.msg-row {
+  position: relative;
+}
+.msg-menu-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+  /* align-self: flex-end; */
+  margin-bottom: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.msg-row:hover .msg-menu-btn,
+.msg-row:focus-within .msg-menu-btn {
+  opacity: 1;
+}
+.msg-menu-btn:hover {
+  background: var(--surface2);
+  color: var(--text);
+}
+
+/* ── Dropdown menu ── */
+.msg-dropdown {
+  display: none;
+  position: fixed;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 4px 0;
+  min-width: 120px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+}
+.msg-dropdown.open {
+  display: block;
+}
+.msg-dropdown-item {
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-soft);
+  transition: background 0.1s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+}
+.msg-dropdown-item:hover {
+  background: var(--surface3);
+  color: var(--text);
+}
+.msg-dropdown-item.danger {
+  color: #ff6b6b;
+}
+.msg-dropdown-item.danger:hover {
+  background: rgba(255, 107, 107, 0.1);
+}
+
+.msg-content-wrapper {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  max-width: min(68%, 320px);
+}
+
+.msg-row.mine .msg-content-wrapper {
+  align-items: flex-end;
 }
