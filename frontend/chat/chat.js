@@ -53,6 +53,42 @@ if (window.visualViewport) {
   window.visualViewport.addEventListener("resize", setAppHeight);
 }
 
+window.toggleAttachMenu = function () {
+  const menu = document.getElementById("attachMenu");
+  if (!menu) return;
+  const willOpen = !menu.classList.contains("open");
+  closeAttachMenu();
+  togglePicker(false);
+  if (willOpen) menu.classList.add("open");
+};
+
+function closeAttachMenu() {
+  document.getElementById("attachMenu")?.classList.remove("open");
+}
+
+window.attachImage = function () {
+  closeAttachMenu();
+  document.getElementById("imageInput").click();
+};
+
+window.attachVoice = function () {
+  closeAttachMenu();
+  window.startVoiceRecording();
+};
+
+document.addEventListener("click", (e) => {
+  const menu = document.getElementById("attachMenu");
+  const btn = document.getElementById("plusBtn");
+  if (
+    menu?.classList.contains("open") &&
+    !menu.contains(e.target) &&
+    e.target !== btn &&
+    !btn?.contains(e.target)
+  ) {
+    closeAttachMenu();
+  }
+});
+
 // ── Contact names cache ───────────────────────────────────────
 let contactNames = {};
 
@@ -97,6 +133,7 @@ function initEmojiPicker() {
 
   trigger.addEventListener("click", (e) => {
     e.stopPropagation();
+    closeAttachMenu();
     togglePicker(!pickerVisible);
   });
 
@@ -667,6 +704,7 @@ window.selectUser = async function (id) {
   state.selectedUser = id;
   closeSidebar();
   togglePicker(false);
+  closeAttachMenu();
   clearUnreadFor(id);
 
   document
