@@ -37,7 +37,9 @@ body {
 /* ── Layout ── */
 .layout {
   display: flex;
-  height: 100vh;
+  height: 100vh; /* фолбек за по-стари браузъри */
+  height: 100dvh; /* реалната видима височина, без адресната лента */
+  height: var(--app-height, 100dvh); /* JS фолбек за браузъри без dvh */
   position: relative;
 }
 

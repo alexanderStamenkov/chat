@@ -39,6 +39,20 @@ import {
   isTabActive,
 } from "../shared/notifications.js";
 
+// ── Мобилна височина на екрана (фикс за 100vh зад адресната лента) ──
+function setAppHeight() {
+  document.documentElement.style.setProperty(
+    "--app-height",
+    `${window.innerHeight}px`,
+  );
+}
+setAppHeight();
+window.addEventListener("resize", setAppHeight);
+window.addEventListener("orientationchange", setAppHeight);
+if (window.visualViewport) {
+  window.visualViewport.addEventListener("resize", setAppHeight);
+}
+
 // ── Contact names cache ───────────────────────────────────────
 let contactNames = {};
 
