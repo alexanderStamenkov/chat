@@ -155,6 +155,23 @@ body {
   color: var(--text-muted);
 }
 
+.unread-badge {
+  flex-shrink: 0;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #0a0a0b;
+  font-family: "Syne", sans-serif;
+  font-weight: 700;
+  font-size: 10.5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
 .sidebar-footer {
   padding: 12px 16px;
   border-top: 1px solid var(--border);
@@ -622,6 +639,143 @@ input#msgInput::placeholder {
 }
 #picker-container.open {
   display: block;
+}
+
+/* ── Гласови съобщения: записваща лента ── */
+.recording-bar {
+  display: none;
+  flex: 1;
+  align-items: center;
+  gap: 4px;
+  height: 42px;
+  background: var(--surface2);
+  border: 1px solid rgba(255, 107, 107, 0.35);
+  border-radius: 12px;
+  padding: 0 10px 0 4px;
+}
+.input.recording .input-wrap,
+.input.recording .img-btn,
+.input.recording #emoji-btn,
+.input.recording #sendBtn {
+  display: none;
+}
+.input.recording .recording-bar {
+  display: flex;
+}
+#recordingSendBtn {
+  display: none;
+}
+.input.recording #recordingSendBtn {
+  display: flex;
+}
+
+.recording-cancel {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 7px;
+  margin: 0;
+  width: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.recording-cancel:hover {
+  color: var(--danger);
+  background: rgba(255, 107, 107, 0.1);
+  transform: none;
+  box-shadow: none;
+}
+
+.recording-indicator {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-soft);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.recording-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger);
+  flex-shrink: 0;
+  animation: recordPulse 1.1s ease-in-out infinite;
+}
+@keyframes recordPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+/* ── Гласови съобщения: балонче с плейър ── */
+.voice-bubble {
+  padding: 8px 12px !important;
+}
+.voice-msg {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 168px;
+}
+.voice-play-btn {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.14);
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  transition: background 0.15s;
+}
+.voice-play-btn:hover {
+  background: rgba(255, 255, 255, 0.22);
+  transform: none;
+  box-shadow: none;
+}
+.msg-row.mine .voice-play-btn {
+  background: rgba(0, 0, 0, 0.15);
+}
+.msg-row.mine .voice-play-btn:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+.voice-progress {
+  flex: 1;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.msg-row.mine .voice-progress {
+  background: rgba(0, 0, 0, 0.18);
+}
+.voice-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: currentColor;
+  border-radius: 2px;
+}
+.voice-duration {
+  font-size: 11px;
+  opacity: 0.75;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Toast (shared styles) ── */

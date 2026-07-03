@@ -9,11 +9,27 @@ export async function upsertProfile(id, email) {
   return sb.from("profiles").upsert({ id, email }, { onConflict: "id" });
 }
 
-export async function updateProfile(userId, { displayName, avatarUrl }) {
+export async function updateProfile(
+  userId,
+  { displayName, avatarUrl, onboardingDismissed } = {},
+) {
   const updates = {};
   if (displayName !== undefined) updates.display_name = displayName;
   if (avatarUrl !== undefined) updates.avatar_url = avatarUrl;
+  if (onboardingDismissed !== undefined)
+    updates.onboarding_dismissed = onboardingDismissed;
   return sb.from("profiles").update(updates).eq("id", userId).select().single();
+}
+
+// Извиква се, когато потребителят натисне "Пропусни"/Х на модала при
+// първо влизане — за да не му изскача повече от този акаунт.
+export async function dismissOnboarding(userId) {
+  return sb
+    .from("profiles")
+    .update({ onboarding_dismissed: true })
+    .eq("id", userId)
+    .select()
+    .single();
 }
 
 export async function uploadAvatar(userId, file) {
@@ -86,6 +102,40 @@ export async function sendImageMessage(senderId, receiverId, imageUrl) {
       receiver_id: receiverId,
       content: null,
       image_url: imageUrl,
+    })
+    .select()
+    .single();
+}
+
+// ── Гласови съобщения ────────────────────────────────────────
+export async function uploadVoice(userId, blob) {
+  const ext = (blob.type || "").includes("mp4") ? "m4a" : "webm";
+  const path = `${userId}/${Date.now()}.${ext}`;
+
+  const { error } = await sb.storage
+    .from("voice-messages")
+    .upload(path, blob, { contentType: blob.type || "audio/webm" });
+
+  if (error) return { url: null, error };
+
+  const { data } = sb.storage.from("voice-messages").getPublicUrl(path);
+  return { url: data.publicUrl, error: null };
+}
+
+export async function sendVoiceMessage(
+  senderId,
+  receiverId,
+  audioUrl,
+  durationSeconds,
+) {
+  return sb
+    .from("messages")
+    .insert({
+      sender_id: senderId,
+      receiver_id: receiverId,
+      content: null,
+      audio_url: audioUrl,
+      audio_duration: durationSeconds,
     })
     .select()
     .single();
@@ -170,6 +220,23 @@ export function subscribeToConversation(me, other, onMessage) {
 
 export function unsubscribe(channel) {
   if (channel) sb.removeChannel(channel);
+}
+
+// ── Global incoming messages (за известия, независимо от отворения чат) ──
+export function subscribeToAllIncomingMessages(userId, onMessage) {
+  return sb
+    .channel(`incoming-messages:${userId}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "messages",
+        filter: `receiver_id=eq.${userId}`,
+      },
+      (payload) => onMessage(payload.new),
+    )
+    .subscribe();
 }
 
 // ── Friendships ───────────────────────────────────────────────

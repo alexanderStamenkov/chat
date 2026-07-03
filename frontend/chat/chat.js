@@ -15,20 +15,38 @@ import {
   sendMessage,
   sendImageMessage,
   uploadImage,
+  uploadVoice,
+  sendVoiceMessage,
   subscribeToConversation,
   unsubscribe,
   updateProfile,
   uploadAvatar,
+  dismissOnboarding,
   getContactNames,
   setContactName,
   deleteContactName,
   createOnlineChannel,
   deleteMessage,
+  subscribeToAllIncomingMessages,
 } from "../shared/api.js";
 import { createPicker } from "picmo";
+import {
+  requestNotificationPermission,
+  showBrowserNotification,
+  flashTitle,
+  clearTitleFlash,
+  playNotifySound,
+  isTabActive,
+} from "../shared/notifications.js";
 
 // ── Contact names cache ───────────────────────────────────────
 let contactNames = {};
+
+// ── Профили на приятели (за име/аватар в известията) ───────────
+let friendProfiles = {};
+
+// ── Непрочетени съобщения по контакт ────────────────────────────
+let unreadByUser = {};
 
 function getDisplayName(profile) {
   // Приоритет: локален псевдоним → display_name → email
@@ -139,8 +157,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   updateMeFooter();
 
-  // Покажи модал при първо влизане (няма display_name)
-  if (!state.currentProfile.display_name && !state.currentProfile.avatar_url) {
+  // Покажи модал при първо влизане (няма display_name и не е бил пропуснат преди)
+  if (
+    !state.currentProfile.onboarding_dismissed &&
+    !state.currentProfile.display_name &&
+    !state.currentProfile.avatar_url
+  ) {
     setTimeout(() => openProfileSettings(true), 600);
   }
 
@@ -163,7 +185,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     clearTimeout(typingTimeout);
     typingTimeout = setTimeout(() => trackTyping(false), 1500);
   });
+  msgInput.addEventListener("focus", () => {
+    // На мобилни клавиатурата бута layout-а — задръж последното съобщение видимо.
+    setTimeout(() => scrollToBottomRobust(), 250);
+    setTimeout(() => scrollToBottomRobust(), 500);
+  });
 
+  initMessagesScrollTracking();
   initEmojiPicker();
   loadFriends();
   loadPendingInvites();
@@ -176,7 +204,59 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ── Настройка за дълго натискане (мобилни) ────────────────
   setupLongPress();
+
+  // ── Известия при друг таб / background ────────────────────
+  requestNotificationPermission();
+
+  subscribeToAllIncomingMessages(state.currentUser.id, (msg) => {
+    handleIncomingMessage(msg);
+  });
+
+  // Изчисти мигащото заглавие, щом табът/прозорецът стане активен
+  document.addEventListener("visibilitychange", () => {
+    if (isTabActive()) onTabBecameActive();
+  });
+  window.addEventListener("focus", onTabBecameActive);
 });
+
+// ── Обработка на входящо съобщение (независимо от отворения чат) ──
+function handleIncomingMessage(msg) {
+  const isOpenConversation = state.selectedUser === msg.sender_id;
+  const tabActive = isTabActive();
+
+  // Ако разговорът е отворен И табът е активен, съобщението вече
+  // се обработва от subscribeToConversation по-долу — нищо повече не пращаме.
+  if (isOpenConversation && tabActive) return;
+
+  const senderProfile = friendProfiles[msg.sender_id];
+  const senderName = senderProfile
+    ? getDisplayName(senderProfile)
+    : "Ново съобщение";
+  const preview = msg.image_url ? "📷 Снимка" : msg.content || "";
+
+  if (!tabActive) {
+    showBrowserNotification({
+      title: senderName,
+      body: preview,
+      icon: senderProfile?.avatar_url,
+      onClick: () => window.selectUser(msg.sender_id),
+    });
+    playNotifySound();
+    flashTitle(senderName);
+  } else {
+    // Табът е активен, но разговорът с този човек не е отворен
+    showToast("info", senderName, preview || "Ново съобщение");
+  }
+
+  if (!isOpenConversation) {
+    markUnread(msg.sender_id);
+  }
+}
+
+function onTabBecameActive() {
+  clearTitleFlash();
+  if (state.selectedUser) clearUnreadFor(state.selectedUser);
+}
 
 // ── Останалите функции (без промени) ──────────────────────────
 
@@ -245,6 +325,13 @@ window.openProfileSettings = function (isFirstLogin = false) {
 };
 
 window.closeProfileSettings = function () {
+  if (state.isFirstLogin) {
+    // Потребителят реши да пропусне — запази го, за да не изскача пак.
+    state.currentProfile.onboarding_dismissed = true;
+    dismissOnboarding(state.currentUser.id).catch((err) =>
+      console.error("dismissOnboarding error:", err),
+    );
+  }
   state.isFirstLogin = false;
   document.getElementById("profileModal").style.display = "none";
 };
@@ -298,6 +385,7 @@ window.saveProfile = async function () {
   const { data, error } = await updateProfile(state.currentUser.id, {
     displayName: displayName || null,
     avatarUrl,
+    onboardingDismissed: state.isFirstLogin ? true : undefined,
   });
 
   btn.classList.remove("loading");
@@ -311,6 +399,9 @@ window.saveProfile = async function () {
     ...state.currentProfile,
     display_name: displayName || null,
     avatar_url: avatarUrl,
+    onboarding_dismissed: state.isFirstLogin
+      ? true
+      : state.currentProfile.onboarding_dismissed,
   };
   updateMeFooter();
   showToast("success", "Профилът е запазен!", "");
@@ -382,7 +473,12 @@ async function loadFriends() {
     .map((f) => {
       const friend =
         f.sender_id === state.currentUser.id ? f.receiver : f.sender;
+      friendProfiles[friend.id] = friend;
       const name = getDisplayName(friend);
+      const unread = unreadByUser[friend.id] || 0;
+      const badge = unread
+        ? `<span class="unread-badge">${unread > 9 ? "9+" : unread}</span>`
+        : "";
       return `
       <div class="user" id="user-${friend.id}" onclick="selectUser('${friend.id}')">
         ${renderAvatar(friend, 34)}
@@ -390,11 +486,43 @@ async function loadFriends() {
           <div class="user-name">${escapeHtml(name)}</div>
           <div class="user-hint">Натисни за чат</div>
         </div>
+        ${badge}
       </div>
     `;
     })
     .join("");
   if (state.onlineUsers) updateOnlineStatus(state.onlineUsers);
+}
+
+function setUnreadBadge(userId, count) {
+  const el = document.querySelector(`#user-${userId} .unread-badge`);
+  if (count <= 0) {
+    if (el) el.remove();
+    return;
+  }
+  const text = count > 9 ? "9+" : String(count);
+  if (el) {
+    el.textContent = text;
+  } else {
+    const userEl = document.getElementById(`user-${userId}`);
+    if (userEl) {
+      const span = document.createElement("span");
+      span.className = "unread-badge";
+      span.textContent = text;
+      userEl.appendChild(span);
+    }
+  }
+}
+
+function markUnread(userId) {
+  unreadByUser[userId] = (unreadByUser[userId] || 0) + 1;
+  setUnreadBadge(userId, unreadByUser[userId]);
+}
+
+function clearUnreadFor(userId) {
+  if (!unreadByUser[userId]) return;
+  delete unreadByUser[userId];
+  setUnreadBadge(userId, 0);
 }
 
 // ── Pending invites ───────────────────────────────────────────
@@ -517,12 +645,15 @@ window.addFriend = async function (receiverId) {
 let activeChannel = null;
 
 window.selectUser = async function (id) {
+  if (mediaRecorder) window.cancelVoiceRecording();
+
   unsubscribe(activeChannel);
   activeChannel = null;
 
   state.selectedUser = id;
   closeSidebar();
   togglePicker(false);
+  clearUnreadFor(id);
 
   document
     .querySelectorAll(".user")
@@ -545,6 +676,7 @@ window.selectUser = async function (id) {
     : { id, email: "" };
 
   state.currentFriendProfile = friendProfile;
+  friendProfiles[friendProfile.id] = friendProfile;
 
   const displayName = getDisplayName(friendProfile);
   document.getElementById("chatName").textContent = displayName;
@@ -560,14 +692,15 @@ window.selectUser = async function (id) {
   }
 
   state.messages = data || [];
+  stickToBottom = true; // всеки отворен разговор започва от последното съобщение
   renderMessages();
-  requestAnimationFrame(() => scrollToBottom());
+  scrollToBottomRobust();
 
   activeChannel = subscribeToConversation(state.currentUser.id, id, (msg) => {
     if (state.messages.some((m) => m.id === msg.id)) return;
     state.messages.push(msg);
     renderMessages();
-    requestAnimationFrame(() => scrollToBottom());
+    scrollToBottomRobust();
   });
 
   initTypingIndicator(state.currentUser.id, id);
@@ -596,7 +729,8 @@ window.sendMessage = async function () {
 
   state.messages.push(data);
   renderMessages();
-  scrollToBottom();
+  stickToBottom = true;
+  scrollToBottomRobust();
 };
 
 // ── Image upload ──────────────────────────────────────────────
@@ -636,8 +770,254 @@ window.handleImageUpload = async function (event) {
 
   state.messages.push(data);
   renderMessages();
-  scrollToBottom();
+  stickToBottom = true;
+  scrollToBottomRobust();
 };
+
+// ── Гласови съобщения: запис ────────────────────────────────────
+let mediaRecorder = null;
+let recordedChunks = [];
+let recordingStream = null;
+let recordingStartTime = null;
+let recordingTimerInterval = null;
+
+const MAX_RECORDING_SECONDS = 180; // 3 мин таван, за да не се качват огромни файлове
+
+function pickSupportedAudioMimeType() {
+  const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
+  for (const type of candidates) {
+    if (window.MediaRecorder?.isTypeSupported?.(type)) return type;
+  }
+  return null;
+}
+
+function formatDuration(totalSeconds) {
+  const s = Math.max(0, Math.floor(totalSeconds || 0));
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  return `${m}:${String(rem).padStart(2, "0")}`;
+}
+
+window.startVoiceRecording = async function () {
+  if (!state.selectedUser) return;
+  if (mediaRecorder && mediaRecorder.state === "recording") return;
+
+  if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+    showToast("error", "Не се поддържа", "Браузърът не поддържа запис на глас");
+    return;
+  }
+
+  try {
+    recordingStream = await navigator.mediaDevices.getUserMedia({
+      audio: true,
+    });
+  } catch (err) {
+    showToast(
+      "error",
+      "Няма достъп до микрофона",
+      "Разреши достъп в настройките на браузъра",
+    );
+    return;
+  }
+
+  recordedChunks = [];
+  const mimeType = pickSupportedAudioMimeType();
+  mediaRecorder = new MediaRecorder(
+    recordingStream,
+    mimeType ? { mimeType } : undefined,
+  );
+
+  mediaRecorder.ondataavailable = (e) => {
+    if (e.data && e.data.size > 0) recordedChunks.push(e.data);
+  };
+
+  mediaRecorder.start();
+  recordingStartTime = Date.now();
+  document.getElementById("inputBar").classList.add("recording");
+  updateRecordingTime();
+  recordingTimerInterval = setInterval(updateRecordingTime, 250);
+};
+
+function updateRecordingTime() {
+  const el = document.getElementById("recordingTime");
+  if (!el || !recordingStartTime) return;
+  const elapsed = (Date.now() - recordingStartTime) / 1000;
+  el.textContent = formatDuration(elapsed);
+  if (elapsed >= MAX_RECORDING_SECONDS) window.stopAndSendVoiceRecording();
+}
+
+function stopRecordingInternal() {
+  clearInterval(recordingTimerInterval);
+  recordingTimerInterval = null;
+  document.getElementById("inputBar")?.classList.remove("recording");
+  if (recordingStream) {
+    recordingStream.getTracks().forEach((t) => t.stop());
+    recordingStream = null;
+  }
+}
+
+window.cancelVoiceRecording = function () {
+  if (!mediaRecorder) return;
+  mediaRecorder.onstop = null;
+  if (mediaRecorder.state !== "inactive") mediaRecorder.stop();
+  mediaRecorder = null;
+  recordedChunks = [];
+  stopRecordingInternal();
+};
+
+window.stopAndSendVoiceRecording = function () {
+  if (!mediaRecorder || mediaRecorder.state === "inactive") return;
+
+  const durationSeconds = Math.round((Date.now() - recordingStartTime) / 1000);
+  const recorder = mediaRecorder;
+  mediaRecorder = null;
+
+  recorder.onstop = async () => {
+    stopRecordingInternal();
+
+    if (!recordedChunks.length || durationSeconds < 1) {
+      recordedChunks = [];
+      showToast("info", "Записът е твърде кратък", "");
+      return;
+    }
+
+    const blob = new Blob(recordedChunks, {
+      type: recorder.mimeType || "audio/webm",
+    });
+    recordedChunks = [];
+    await sendVoiceBlob(blob, durationSeconds);
+  };
+
+  recorder.stop();
+};
+
+async function sendVoiceBlob(blob, durationSeconds) {
+  if (!state.selectedUser) return;
+
+  const micBtn = document.getElementById("micBtn");
+  micBtn?.classList.add("loading");
+
+  const { url, error: uploadError } = await uploadVoice(
+    state.currentUser.id,
+    blob,
+  );
+  if (uploadError) {
+    showToast(
+      "error",
+      "Грешка при качване",
+      "Гласовото съобщение не беше качено",
+    );
+    micBtn?.classList.remove("loading");
+    return;
+  }
+
+  const { data, error } = await sendVoiceMessage(
+    state.currentUser.id,
+    state.selectedUser,
+    url,
+    durationSeconds,
+  );
+  micBtn?.classList.remove("loading");
+  if (error) {
+    showToast("error", "Грешка", "Съобщението не беше записано");
+    return;
+  }
+
+  state.messages.push(data);
+  renderMessages();
+  stickToBottom = true;
+  scrollToBottomRobust();
+}
+
+// ── Гласови съобщения: възпроизвеждане ──────────────────────────
+let activeVoiceAudio = null;
+let activeVoiceUrl = null;
+
+function resetVoiceButton(btn) {
+  if (!btn) return;
+  const playIcon = btn.querySelector(".icon-play");
+  const pauseIcon = btn.querySelector(".icon-pause");
+  if (playIcon) playIcon.style.display = "block";
+  if (pauseIcon) pauseIcon.style.display = "none";
+}
+
+// След всеки renderMessages() DOM-ът се пресъздава — ако в момента
+// нещо се възпроизвежда, синхронизирай иконата/прогреса с новия DOM.
+function syncVoicePlaybackUI() {
+  if (!activeVoiceAudio || activeVoiceAudio.paused) return;
+  const btn = document.querySelector(
+    `.voice-play-btn[data-audio-url="${activeVoiceUrl}"]`,
+  );
+  if (!btn) return;
+  btn.querySelector(".icon-play").style.display = "none";
+  btn.querySelector(".icon-pause").style.display = "block";
+}
+
+window.toggleVoicePlayback = function (btn, url) {
+  const playIcon = btn.querySelector(".icon-play");
+  const pauseIcon = btn.querySelector(".icon-pause");
+  const progressFill = btn
+    .closest(".voice-msg")
+    .querySelector(".voice-progress-fill");
+
+  if (activeVoiceAudio && activeVoiceUrl === url) {
+    if (activeVoiceAudio.paused) {
+      activeVoiceAudio.play();
+    } else {
+      activeVoiceAudio.pause();
+    }
+    return;
+  }
+
+  if (activeVoiceAudio) {
+    activeVoiceAudio.pause();
+    resetVoiceButton(
+      document.querySelector(
+        `.voice-play-btn[data-audio-url="${activeVoiceUrl}"]`,
+      ),
+    );
+  }
+
+  const audio = new Audio(url);
+  activeVoiceAudio = audio;
+  activeVoiceUrl = url;
+
+  audio.addEventListener("play", () => {
+    playIcon.style.display = "none";
+    pauseIcon.style.display = "block";
+  });
+  audio.addEventListener("pause", () => {
+    playIcon.style.display = "block";
+    pauseIcon.style.display = "none";
+  });
+  audio.addEventListener("timeupdate", () => {
+    if (audio.duration) {
+      progressFill.style.width = `${(audio.currentTime / audio.duration) * 100}%`;
+    }
+  });
+  audio.addEventListener("ended", () => {
+    resetVoiceButton(btn);
+    progressFill.style.width = "0%";
+    activeVoiceAudio = null;
+    activeVoiceUrl = null;
+  });
+
+  audio.play();
+};
+
+function renderVoiceBubble(m) {
+  const duration = m.audio_duration ? formatDuration(m.audio_duration) : "";
+  return `
+    <div class="voice-msg">
+      <button class="voice-play-btn" data-audio-url="${m.audio_url}" onclick="toggleVoicePlayback(this, '${m.audio_url}')">
+        <svg class="icon-play" viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+        <svg class="icon-pause" viewBox="0 0 24 24" fill="currentColor" width="13" height="13" style="display:none"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+      </button>
+      <div class="voice-progress"><div class="voice-progress-fill"></div></div>
+      <div class="voice-duration">${duration}</div>
+    </div>
+  `;
+}
 
 // ── Render messages ───────────────────────────────────────────
 function renderMessages() {
@@ -660,7 +1040,9 @@ function renderMessages() {
 
       const bubbleContent = m.image_url
         ? `<img src="${m.image_url}" class="msg-image" onclick="openImage('${m.image_url}')" />`
-        : escapeHtml(m.content || "");
+        : m.audio_url
+          ? renderVoiceBubble(m)
+          : escapeHtml(m.content || "");
 
       // ⬇️ Бутон с 3 точки (само за моите съобщения)
       const menuButton = isMine
@@ -671,7 +1053,7 @@ function renderMessages() {
       <div class="msg-row ${isMine ? "mine" : ""}" data-msg-id="${m.id}">
         ${avatarHtml}
         <div class="msg-content-wrapper">
-          <div class="msg-bubble ${m.image_url ? "image-bubble" : ""}">
+          <div class="msg-bubble ${m.image_url ? "image-bubble" : ""} ${m.audio_url ? "voice-bubble" : ""}">
             ${bubbleContent}
           </div>
           <div class="msg-time">${timeStr(m.created_at)}</div>
@@ -681,17 +1063,69 @@ function renderMessages() {
     `;
     })
     .join("");
+
+  syncVoicePlaybackUI();
 }
 
 window.openImage = (url) => window.open(url, "_blank");
+
+// ── Скрол до последното съобщение (устойчив на снимки/шрифтове/клавиатура) ──
+let stickToBottom = true;
 
 function scrollToBottom() {
   const c = document.getElementById("messages");
   if (c) c.scrollTop = c.scrollHeight;
 }
 
+// Извиква се при: отваряне на разговор, изпращане/получаване на съобщение.
+// Скролва веднага, после пак — след като аватарите/снимките се заредят
+// и след кратки паузи, за да хване по-бавни reflow-и (шрифтове, клавиатура,
+// адресна лента на мобилен браузър и т.н.).
+function scrollToBottomRobust() {
+  if (!stickToBottom) return;
+  scrollToBottom();
+  requestAnimationFrame(scrollToBottom);
+  waitForImagesThenScroll();
+  setTimeout(() => stickToBottom && scrollToBottom(), 60);
+  setTimeout(() => stickToBottom && scrollToBottom(), 300);
+}
+
+function waitForImagesThenScroll() {
+  const container = document.getElementById("messages");
+  if (!container) return;
+  container.querySelectorAll("img").forEach((img) => {
+    if (img.complete) return;
+    const onDone = () => {
+      if (stickToBottom) scrollToBottom();
+    };
+    img.addEventListener("load", onDone, { once: true });
+    img.addEventListener("error", onDone, { once: true });
+  });
+}
+
+// Проследява дали потребителят е ръчно скролнал нагоре, за да не го
+// "дърпаме" насила обратно надолу, докато чете стари съобщения.
+function initMessagesScrollTracking() {
+  const c = document.getElementById("messages");
+  if (!c || c.dataset.scrollBound) return;
+  c.dataset.scrollBound = "1";
+  c.addEventListener("scroll", () => {
+    const distanceFromBottom = c.scrollHeight - c.scrollTop - c.clientHeight;
+    stickToBottom = distanceFromBottom < 120;
+  });
+}
+
+// Мобилна клавиатура / промяна на viewport-а — задръж дъното, ако сме там.
+window.addEventListener("resize", () => scrollToBottomRobust());
+if (window.visualViewport) {
+  window.visualViewport.addEventListener("resize", () =>
+    scrollToBottomRobust(),
+  );
+}
+
 // ── Auth ──────────────────────────────────────────────────────
 window.handleLogout = async function () {
+  if (mediaRecorder) window.cancelVoiceRecording();
   const { error } = await logout();
   if (error) {
     showToast("error", "Грешка", "Не можах да те изпиша");
