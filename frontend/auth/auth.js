@@ -25,11 +25,13 @@ function renderTurnstileWidgets() {
   if (turnstileLoginWidgetId === null) {
     turnstileLoginWidgetId = turnstile.render("#turnstileLogin", {
       sitekey: TURNSTILE_SITE_KEY,
+      appearance: "interaction-only",
     });
   }
   if (turnstileRegisterWidgetId === null) {
     turnstileRegisterWidgetId = turnstile.render("#turnstileRegister", {
       sitekey: TURNSTILE_SITE_KEY,
+      appearance: "interaction-only",
     });
   }
 }
