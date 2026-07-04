@@ -6,6 +6,11 @@
     <title>Вход — Диалог</title>
     <link rel="stylesheet" href="auth.css" />
     <link rel="stylesheet" href="../shared/toast.css" />
+    <script
+      src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+      async
+      defer
+    ></script>
   </head>
 
   <body>
@@ -49,6 +54,11 @@
             autocomplete="current-password"
           />
         </div>
+        <div
+          class="cf-turnstile"
+          id="turnstileLogin"
+          style="margin-bottom: 14px"
+        ></div>
         <button onclick="handleLogin()">Влез →</button>
       </div>
 
@@ -72,6 +82,11 @@
             autocomplete="new-password"
           />
         </div>
+        <div
+          class="cf-turnstile"
+          id="turnstileRegister"
+          style="margin-bottom: 14px"
+        ></div>
         <button onclick="handleRegister()">Създай акаунт →</button>
       </div>
 

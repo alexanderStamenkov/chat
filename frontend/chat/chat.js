@@ -89,6 +89,15 @@ document.addEventListener("click", (e) => {
   }
 });
 
+// ── Помощник: ако грешката идва от rate-limit тригера в базата,
+// покажи точно неговото съобщение вместо генерично "Грешка".
+function friendlyError(error, fallbackTitle, fallbackMsg) {
+  if (error?.message && /лимит|Твърде/i.test(error.message)) {
+    return { title: "Твърде бързо", msg: error.message };
+  }
+  return { title: fallbackTitle, msg: fallbackMsg };
+}
+
 // ── Contact names cache ───────────────────────────────────────
 let contactNames = {};
 
@@ -683,7 +692,8 @@ async function doSearch(email) {
 window.addFriend = async function (receiverId) {
   const { error } = await sendFriendRequest(state.currentUser.id, receiverId);
   if (error) {
-    showToast("error", "Грешка", "Не можах да изпратя покана");
+    const t = friendlyError(error, "Грешка", "Не можах да изпратя покана");
+    showToast("error", t.title, t.msg);
     return;
   }
   showToast("success", "Поканата е изпратена!", "");
@@ -774,7 +784,8 @@ window.sendMessage = async function () {
     content,
   );
   if (error) {
-    showToast("error", "Грешка", "Съобщението не беше изпратено");
+    const t = friendlyError(error, "Грешка", "Съобщението не беше изпратено");
+    showToast("error", t.title, t.msg);
     input.value = content;
     return;
   }
@@ -816,7 +827,8 @@ window.handleImageUpload = async function (event) {
   );
   imgBtn.classList.remove("loading");
   if (error) {
-    showToast("error", "Грешка", "Съобщението не беше записано");
+    const t = friendlyError(error, "Грешка", "Съобщението не беше записано");
+    showToast("error", t.title, t.msg);
     return;
   }
 
@@ -971,7 +983,8 @@ async function sendVoiceBlob(blob, durationSeconds) {
   );
   micBtn?.classList.remove("loading");
   if (error) {
-    showToast("error", "Грешка", "Съобщението не беше записано");
+    const t = friendlyError(error, "Грешка", "Съобщението не беше записано");
+    showToast("error", t.title, t.msg);
     return;
   }
 

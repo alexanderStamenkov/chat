@@ -1,3 +1,5 @@
+import { escapeHtml } from "./utils.js";
+
 export function showToast(type, title, msg) {
   let container = document.getElementById("toastContainer");
   if (!container) {
@@ -13,8 +15,8 @@ export function showToast(type, title, msg) {
   toast.innerHTML = `
     <div class="toast-icon">${icons[type] || "i"}</div>
     <div class="toast-body">
-      <div class="toast-title">${title}</div>
-      ${msg ? `<div class="toast-msg">${msg}</div>` : ""}
+      <div class="toast-title">${escapeHtml(title)}</div>
+      ${msg ? `<div class="toast-msg">${escapeHtml(msg)}</div>` : ""}
     </div>
     <button class="toast-close" onclick="this.closest('.toast').remove()">×</button>
   `;

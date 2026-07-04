@@ -1288,3 +1288,38 @@ input#msgInput::placeholder {
 .msg-row.mine .msg-content-wrapper {
   align-items: flex-end;
 }
+
+#picker-container .picmo__picker {
+  --background-color: #18181c;
+  --secondary-background-color: #222228;
+  --border-color: rgba(255, 255, 255, 0.07);
+  --text-color: #f0f0f2;
+  --secondary-text-color: #888894;
+  --hover-background-color: #222228;
+  --focus-indicator-color: #c8f060;
+  --category-tab-active-indicator-color: #c8f060;
+  --search-background-color: #111113;
+  --search-focus-background-color: #111113;
+  --search-placeholder-color: #55555f;
+  --tag-background-color: #222228;
+  --category-name-background-color: #18181c;
+  --category-name-text-color: #55555f;
+  --scrollbar-color: #222228;
+  --scrollbar-thumb-color: #333340;
+  border-radius: 12px;
+}
+
+#picker-container .picmo__picker * {
+  scrollbar-color: #333340 #18181c;
+  scrollbar-width: thin;
+}
+#picker-container .picmo__picker *::-webkit-scrollbar {
+  width: 4px;
+}
+#picker-container .picmo__picker *::-webkit-scrollbar-track {
+  background: #18181c;
+}
+#picker-container .picmo__picker *::-webkit-scrollbar-thumb {
+  background: #333340;
+  border-radius: 2px;
+}
