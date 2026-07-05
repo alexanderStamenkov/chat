@@ -412,9 +412,13 @@ body {
   padding: 0 2px;
   margin-top: 2px;
   opacity: 0.6;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 .msg-row.mine .msg-time {
   text-align: right;
+  justify-content: flex-end;
 }
 
 /* Input */
@@ -1289,6 +1293,123 @@ input#msgInput::placeholder {
   align-items: flex-end;
 }
 
+/* ── Реакции с емоджита ── */
+.msg-react-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 6px;
+  margin-bottom: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.msg-row:hover .msg-react-btn,
+.msg-row:focus-within .msg-react-btn {
+  opacity: 1;
+}
+.msg-react-btn:hover {
+  background: var(--surface2);
+  color: var(--text);
+}
+
+.reaction-picker {
+  display: none;
+  position: fixed;
+  align-items: center;
+  gap: 4px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+}
+.reaction-picker.open {
+  display: flex;
+}
+.reaction-picker button {
+  background: none;
+  border: none;
+  font-size: 19px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+  margin: 0;
+  width: auto;
+  border-radius: 8px;
+  transition:
+    transform 0.1s,
+    background 0.1s;
+}
+.reaction-picker button:hover {
+  background: var(--surface3);
+  transform: scale(1.2) translateY(-1px);
+  box-shadow: none;
+}
+
+.msg-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 3px;
+}
+.reaction-pill {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-size: 12px;
+  cursor: pointer;
+  margin: 0;
+  width: auto;
+  color: var(--text-soft);
+  transition: all 0.15s;
+}
+.reaction-pill:hover {
+  background: var(--surface3);
+  transform: none;
+  box-shadow: none;
+}
+.reaction-pill.mine {
+  border-color: rgba(200, 240, 96, 0.4);
+  background: rgba(200, 240, 96, 0.1);
+  color: var(--accent);
+}
+
+/* ── "Доставено"/"Прочетено" отметки ── */
+.msg-ticks {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+.msg-ticks.sent .tick2 {
+  display: none;
+}
+.msg-ticks.read {
+  color: var(--accent);
+}
+
+/* ── Индикатор за редактирано съобщение ── */
+.msg-edited {
+  opacity: 0.75;
+  font-style: italic;
+}
+
+/* На мобилно няма hover — покажи бутоните директно, за да се виждат */
+@media (max-width: 640px) {
+  .msg-react-btn,
+  .msg-menu-btn {
+    opacity: 1;
+  }
+}
+
 #picker-container .picmo__picker {
   --background-color: #18181c;
   --secondary-background-color: #222228;
@@ -1322,4 +1443,3 @@ input#msgInput::placeholder {
 #picker-container .picmo__picker *::-webkit-scrollbar-thumb {
   background: #333340;
   border-radius: 2px;
-}

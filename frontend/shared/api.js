@@ -152,6 +152,73 @@ export async function deleteMessage(messageId, userId) {
     .single();
 }
 
+// ── Редакция на съобщение ────────────────────────────────────
+export async function editMessage(messageId, userId, newContent) {
+  return sb
+    .from("messages")
+    .update({ content: newContent, edited_at: new Date().toISOString() })
+    .eq("id", messageId)
+    .eq("sender_id", userId)
+    .select()
+    .single();
+}
+
+// ── "Доставено" / "Прочетено" ────────────────────────────────
+export async function markMessagesDelivered(userId, messageIds) {
+  if (!messageIds?.length) return { data: null, error: null };
+  return sb
+    .from("messages")
+    .update({ delivered_at: new Date().toISOString() })
+    .in("id", messageIds)
+    .eq("receiver_id", userId)
+    .is("delivered_at", null);
+}
+
+export async function markConversationRead(userId, otherUserId) {
+  return sb
+    .from("messages")
+    .update({ read_at: new Date().toISOString() })
+    .eq("receiver_id", userId)
+    .eq("sender_id", otherUserId)
+    .is("read_at", null);
+}
+
+// ── Реакции с емоджита ────────────────────────────────────────
+export async function setReaction(messageId, userId, emoji) {
+  return sb
+    .from("message_reactions")
+    .upsert(
+      { message_id: messageId, user_id: userId, emoji },
+      { onConflict: "message_id,user_id" },
+    )
+    .select()
+    .single();
+}
+
+export async function removeReaction(messageId, userId) {
+  return sb
+    .from("message_reactions")
+    .delete()
+    .eq("message_id", messageId)
+    .eq("user_id", userId);
+}
+
+export async function getReactionsForMessages(messageIds) {
+  if (!messageIds?.length) return { data: [], error: null };
+  return sb.from("message_reactions").select("*").in("message_id", messageIds);
+}
+
+export function subscribeToReactions(onChange) {
+  return sb
+    .channel("message-reactions")
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "message_reactions" },
+      onChange,
+    )
+    .subscribe();
+}
+
 // ── Storage ───────────────────────────────────────────────────
 export async function uploadImage(userId, file) {
   const ext = file.name.split(".").pop();
@@ -204,26 +271,50 @@ export async function getUser() {
 }
 
 // ── Realtime messages ─────────────────────────────────────────
-export function subscribeToConversation(me, other, onMessage) {
-  return sb
-    .channel(`conversation:${[me, other].sort().join("-")}`)
-    .on(
-      "postgres_changes",
-      {
-        event: "INSERT",
-        schema: "public",
-        table: "messages",
-        filter: `sender_id=eq.${other}`,
-      },
-      (payload) => {
-        const msg = payload.new;
-        const isRelevant =
-          (msg.sender_id === me && msg.receiver_id === other) ||
-          (msg.sender_id === other && msg.receiver_id === me);
-        if (isRelevant) onMessage(msg);
-      },
-    )
-    .subscribe();
+export function subscribeToConversation(me, other, onInsert, onUpdate) {
+  const channel = sb.channel(`conversation:${[me, other].sort().join("-")}`);
+
+  channel.on(
+    "postgres_changes",
+    {
+      event: "INSERT",
+      schema: "public",
+      table: "messages",
+      filter: `sender_id=eq.${other}`,
+    },
+    (payload) => {
+      const msg = payload.new;
+      const isRelevant =
+        (msg.sender_id === me && msg.receiver_id === other) ||
+        (msg.sender_id === other && msg.receiver_id === me);
+      if (isRelevant) onInsert(msg);
+    },
+  );
+
+  // Промени по вече съществуващи съобщения в този разговор:
+  // редакция/изтриване (от другия) или доставено/прочетено (от мен ↔ него)
+  channel.on(
+    "postgres_changes",
+    {
+      event: "UPDATE",
+      schema: "public",
+      table: "messages",
+      filter: `sender_id=eq.${other}`,
+    },
+    (payload) => onUpdate?.(payload.new),
+  );
+  channel.on(
+    "postgres_changes",
+    {
+      event: "UPDATE",
+      schema: "public",
+      table: "messages",
+      filter: `sender_id=eq.${me}`,
+    },
+    (payload) => onUpdate?.(payload.new),
+  );
+
+  return channel.subscribe();
 }
 
 export function unsubscribe(channel) {

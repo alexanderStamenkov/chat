@@ -27,6 +27,13 @@ import {
   deleteContactName,
   createOnlineChannel,
   deleteMessage,
+  editMessage,
+  markMessagesDelivered,
+  markConversationRead,
+  setReaction,
+  removeReaction,
+  getReactionsForMessages,
+  subscribeToReactions,
   subscribeToAllIncomingMessages,
 } from "../shared/api.js";
 import { createPicker } from "picmo";
@@ -106,6 +113,9 @@ let friendProfiles = {};
 
 // ── Непрочетени съобщения по контакт ────────────────────────────
 let unreadByUser = {};
+
+// ── Реакции по съобщение: { messageId: [{message_id, user_id, emoji}] } ──
+let reactionsByMessage = {};
 
 function getDisplayName(profile) {
   // Приоритет: локален псевдоним → display_name → email
@@ -272,6 +282,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     handleIncomingMessage(msg);
   });
 
+  subscribeToReactions(handleReactionChange);
+
   // Изчисти мигащото заглавие, щом табът/прозорецът стане активен
   document.addEventListener("visibilitychange", () => {
     if (isTabActive()) onTabBecameActive();
@@ -283,6 +295,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 function handleIncomingMessage(msg) {
   const isOpenConversation = state.selectedUser === msg.sender_id;
   const tabActive = isTabActive();
+
+  markMessagesDelivered(state.currentUser.id, [msg.id]);
 
   // Ако разговорът е отворен И табът е активен, съобщението вече
   // се обработва от subscribeToConversation по-долу — нищо повече не пращаме.
@@ -313,9 +327,127 @@ function handleIncomingMessage(msg) {
   }
 }
 
+// ── Реакции: realtime синхронизация ────────────────────────────
+function handleReactionChange(payload) {
+  const row = payload.new?.id ? payload.new : payload.old;
+  if (!row) return;
+  const messageId = row.message_id;
+
+  // Обновявай само ако съобщението е част от текущо отворения разговор
+  if (!state.messages.some((m) => m.id === messageId)) return;
+
+  const list = (reactionsByMessage[messageId] || []).filter(
+    (r) => r.user_id !== row.user_id,
+  );
+  if (payload.eventType !== "DELETE") {
+    list.push({
+      message_id: messageId,
+      user_id: row.user_id,
+      emoji: row.emoji,
+    });
+  }
+  reactionsByMessage[messageId] = list;
+  renderMessages();
+}
+
+const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
+
+window.toggleReactionPicker = function (event, messageId) {
+  event.stopPropagation();
+  closeDropdown();
+
+  const picker = document.createElement("div");
+  picker.className = "reaction-picker open";
+  picker.innerHTML = QUICK_REACTIONS.map(
+    (e) =>
+      `<button onclick="toggleReaction('${messageId}', '${e}')">${e}</button>`,
+  ).join("");
+
+  const btn = event.currentTarget;
+  const rect = btn.getBoundingClientRect();
+  picker.style.left = `${Math.max(8, rect.left - 90)}px`;
+  picker.style.top = `${rect.bottom + 6}px`;
+  document.body.appendChild(picker);
+  activeDropdown = picker;
+
+  setTimeout(() => {
+    document.addEventListener("click", closeDropdown, { once: true });
+  }, 10);
+};
+
+window.toggleReaction = async function (messageId, emoji) {
+  closeDropdown();
+  const list = reactionsByMessage[messageId] || [];
+  const mine = list.find((r) => r.user_id === state.currentUser.id);
+
+  if (mine && mine.emoji === emoji) {
+    reactionsByMessage[messageId] = list.filter(
+      (r) => r.user_id !== state.currentUser.id,
+    );
+    renderMessages();
+    const { error } = await removeReaction(messageId, state.currentUser.id);
+    if (error) showToast("error", "Грешка", "Не можах да махна реакцията");
+    return;
+  }
+
+  reactionsByMessage[messageId] = [
+    ...list.filter((r) => r.user_id !== state.currentUser.id),
+    { message_id: messageId, user_id: state.currentUser.id, emoji },
+  ];
+  renderMessages();
+
+  const { error } = await setReaction(messageId, state.currentUser.id, emoji);
+  if (error) showToast("error", "Грешка", "Не можах да добавя реакцията");
+};
+
+function renderReactionPills(messageId, reactions) {
+  if (!reactions.length) return "";
+  const counts = {};
+  let myEmoji = null;
+  reactions.forEach((r) => {
+    counts[r.emoji] = (counts[r.emoji] || 0) + 1;
+    if (r.user_id === state.currentUser.id) myEmoji = r.emoji;
+  });
+
+  return `
+    <div class="msg-reactions">
+      ${Object.entries(counts)
+        .map(
+          ([emoji, count]) => `
+        <button class="reaction-pill ${emoji === myEmoji ? "mine" : ""}" onclick="toggleReaction('${messageId}', '${emoji}')">
+          ${emoji}${count > 1 ? ` ${count}` : ""}
+        </button>
+      `,
+        )
+        .join("")}
+    </div>
+  `;
+}
+
 function onTabBecameActive() {
   clearTitleFlash();
-  if (state.selectedUser) clearUnreadFor(state.selectedUser);
+  if (state.selectedUser) {
+    clearUnreadFor(state.selectedUser);
+    markOpenConversationRead();
+  }
+}
+
+// ── "Прочетено": маркирай отворения разговор, ако табът е активен ──
+async function markOpenConversationRead() {
+  if (!state.selectedUser || !isTabActive()) return;
+  const hasUnread = state.messages.some(
+    (m) => m.receiver_id === state.currentUser.id && !m.read_at,
+  );
+  if (!hasUnread) return;
+
+  const nowIso = new Date().toISOString();
+  await markConversationRead(state.currentUser.id, state.selectedUser);
+  state.messages = state.messages.map((m) =>
+    m.receiver_id === state.currentUser.id && !m.read_at
+      ? { ...m, read_at: nowIso }
+      : m,
+  );
+  renderMessages();
 }
 
 // ── Останалите функции (без промени) ──────────────────────────
@@ -755,15 +887,39 @@ window.selectUser = async function (id) {
 
   state.messages = data || [];
   stickToBottom = true; // всеки отворен разговор започва от последното съобщение
+
+  reactionsByMessage = {};
+  const messageIds = state.messages.map((m) => m.id);
+  const { data: reactionsData } = await getReactionsForMessages(messageIds);
+  (reactionsData || []).forEach((r) => {
+    (reactionsByMessage[r.message_id] ||= []).push(r);
+  });
+
   renderMessages();
   scrollToBottomRobust();
+  markOpenConversationRead();
 
-  activeChannel = subscribeToConversation(state.currentUser.id, id, (msg) => {
-    if (state.messages.some((m) => m.id === msg.id)) return;
-    state.messages.push(msg);
-    renderMessages();
-    scrollToBottomRobust();
-  });
+  activeChannel = subscribeToConversation(
+    state.currentUser.id,
+    id,
+    (msg) => {
+      if (state.messages.some((m) => m.id === msg.id)) return;
+      state.messages.push(msg);
+      renderMessages();
+      scrollToBottomRobust();
+      markOpenConversationRead();
+    },
+    (updated) => {
+      const idx = state.messages.findIndex((m) => m.id === updated.id);
+      if (idx === -1) return;
+      if (updated.deleted_at) {
+        state.messages.splice(idx, 1);
+      } else {
+        state.messages[idx] = updated;
+      }
+      renderMessages();
+    },
+  );
 
   initTypingIndicator(state.currentUser.id, id);
 };
@@ -1114,6 +1270,20 @@ function renderMessages() {
         ? `<button class="msg-menu-btn" data-msg-id="${m.id}" onclick="event.stopPropagation(); toggleMessageMenu(event, '${m.id}')">⋮</button>`
         : "";
 
+      // ⬇️ Бутон за бърза реакция (за всички съобщения)
+      const reactBtn = `<button class="msg-react-btn" data-msg-id="${m.id}" onclick="event.stopPropagation(); toggleReactionPicker(event, '${m.id}')">😊</button>`;
+
+      const reactionsHtml = renderReactionPills(
+        m.id,
+        reactionsByMessage[m.id] || [],
+      );
+
+      const editedBadge = m.edited_at
+        ? `<span class="msg-edited">· редактирано</span>`
+        : "";
+
+      const ticksHtml = isMine ? renderStatusTicks(m) : "";
+
       return `
       <div class="msg-row ${isMine ? "mine" : ""}" data-msg-id="${m.id}">
         ${avatarHtml}
@@ -1121,8 +1291,14 @@ function renderMessages() {
           <div class="msg-bubble ${m.image_url ? "image-bubble" : ""} ${m.audio_url ? "voice-bubble" : ""}">
             ${bubbleContent}
           </div>
-          <div class="msg-time">${timeStr(m.created_at)}</div>
+          ${reactionsHtml}
+          <div class="msg-time">
+            ${timeStr(m.created_at)}
+            ${editedBadge}
+            ${ticksHtml}
+          </div>
         </div>
+        ${reactBtn}
         ${menuButton}
       </div>
     `;
@@ -1130,6 +1306,16 @@ function renderMessages() {
     .join("");
 
   syncVoicePlaybackUI();
+}
+
+function renderStatusTicks(m) {
+  const status = m.read_at ? "read" : m.delivered_at ? "delivered" : "sent";
+  return `
+    <svg class="msg-ticks ${status}" viewBox="0 0 16 11" width="14" height="10" fill="none">
+      <path class="tick tick1" d="M1 5.5L4.5 9L10 2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+      <path class="tick tick2" d="M6 5.5L9.5 9L15 2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  `;
 }
 
 window.openImage = (url) => window.open(url, "_blank");
@@ -1227,9 +1413,17 @@ window.toggleMessageMenu = function (event, messageId) {
   const row = event.target.closest(".msg-row");
   if (!row) return;
 
+  const msg = state.messages.find((m) => m.id === messageId);
+  const canEdit = msg && !msg.image_url && !msg.audio_url;
+
   const dropdown = document.createElement("div");
   dropdown.className = "msg-dropdown open";
   dropdown.innerHTML = `
+    ${
+      canEdit
+        ? `<button class="msg-dropdown-item" onclick="startEditMessage('${messageId}')">✏️ Редактирай</button>`
+        : ""
+    }
     <button class="msg-dropdown-item danger" onclick="confirmDeleteMessage('${messageId}')">
       🗑️ Изтрий
     </button>
@@ -1257,6 +1451,41 @@ function closeDropdown() {
       }
     }, 150);
   }
+}
+
+window.startEditMessage = function (messageId) {
+  closeDropdown();
+  const msg = state.messages.find((m) => m.id === messageId);
+  if (!msg || msg.sender_id !== state.currentUser.id) return;
+  if (msg.image_url || msg.audio_url) return; // само текстови съобщения
+
+  const newContent = prompt("Редактирай съобщението:", msg.content || "");
+  if (newContent === null) return; // отказ
+  const trimmed = newContent.trim();
+  if (!trimmed || trimmed === msg.content) return;
+
+  editMessageRequest(messageId, trimmed);
+};
+
+async function editMessageRequest(messageId, content) {
+  const { data, error } = await editMessage(
+    messageId,
+    state.currentUser.id,
+    content,
+  );
+  if (error) {
+    const t = friendlyError(
+      error,
+      "Грешка",
+      "Не можах да редактирам съобщението",
+    );
+    showToast("error", t.title, t.msg);
+    return;
+  }
+
+  const idx = state.messages.findIndex((m) => m.id === messageId);
+  if (idx !== -1) state.messages[idx] = data;
+  renderMessages();
 }
 
 window.confirmDeleteMessage = async function (messageId) {
