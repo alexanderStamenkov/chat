@@ -5,13 +5,22 @@ import {
   loginWithGoogle,
   upsertProfile,
 } from "../shared/api.js";
+import { TURNSTILE_PROD_KEY, TURNSTILE_TEST_KEY } from "../shared/supabase.js";
 import { showToast } from "../shared/toast.js";
 
 let currentTab = "login";
 
-// Публичният sitekey на Cloudflare Turnstile (безопасен за клиента).
-// Тайният ключ се слага в Supabase Dashboard → Authentication → Attack Protection.
-const TURNSTILE_SITE_KEY = "0x4AAAAAADvgcXOmlSgK7uC2";
+const PROD_TURNSTILE_SITE_KEY = TURNSTILE_PROD_KEY;
+const TEST_TURNSTILE_SITE_KEY = TURNSTILE_TEST_KEY;
+
+const isLocalDev =
+  location.hostname === "localhost" ||
+  location.hostname === "127.0.0.1" ||
+  location.hostname === "[::1]";
+
+const TURNSTILE_SITE_KEY = isLocalDev
+  ? TEST_TURNSTILE_SITE_KEY
+  : PROD_TURNSTILE_SITE_KEY;
 
 let turnstileLoginWidgetId = null;
 let turnstileRegisterWidgetId = null;

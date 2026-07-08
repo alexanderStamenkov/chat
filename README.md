@@ -70,12 +70,6 @@ Here are the features currently in development or planned for future releases:
 
 [ ] Push Notifications: Native push alerts using Service Workers (Supabase Edge Function send-push infrastructure is underway).
 
-[ ] Message Reactions: Quick emoji reactions to specific messages.
-
-[ ] Message Receipts: "Delivered" and "Read" checkmarks.
-
-[ ] Message Editing: Ability to edit sent messages (currently supports deletion only).
-
 [ ] Group Chats: Expand from 1-on-1 messaging to multi-user group channels.
 
 [ ] Chat History Search: Quick text search inside message histories.
