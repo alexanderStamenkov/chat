@@ -35,6 +35,19 @@ import {
   getReactionsForMessages,
   subscribeToReactions,
   subscribeToAllIncomingMessages,
+  createGroup,
+  addGroupMember,
+  getMyGroups,
+  getGroupMembers,
+  leaveGroup,
+  removeGroupMember,
+  renameGroup,
+  getGroupMessages,
+  sendGroupMessage,
+  sendGroupImageMessage,
+  sendGroupVoiceMessage,
+  subscribeToGroupConversation,
+  subscribeToAllIncomingGroupMessages,
 } from "../shared/api.js";
 import { createPicker } from "picmo";
 import {
@@ -116,6 +129,12 @@ let unreadByUser = {};
 
 // ── Реакции по съобщение: { messageId: [{message_id, user_id, emoji}] } ──
 let reactionsByMessage = {};
+
+// ── Групи: кеш на моите групи и членовете им ────────────────────
+let myGroups = {}; // { groupId: { id, name, avatar_url, role } }
+let groupMemberProfiles = {}; // { groupId: { userId: profile } }
+let unreadByGroup = {};
+let incomingGroupChannel = null;
 
 function getDisplayName(profile) {
   // Приоритет: локален псевдоним → display_name → email
@@ -266,6 +285,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   loadFriends();
   loadPendingInvites();
   subscribeToFriendRequests(state.currentUser.id, onNewFriendRequest);
+  loadGroups();
 
   createOnlineChannel(state.currentUser.id, (onlineIds) => {
     state.onlineUsers = onlineIds;
@@ -429,6 +449,9 @@ function onTabBecameActive() {
   if (state.selectedUser) {
     clearUnreadFor(state.selectedUser);
     markOpenConversationRead();
+  }
+  if (state.selectedGroup) {
+    clearGroupUnreadFor(state.selectedGroup);
   }
 }
 
@@ -717,6 +740,446 @@ function clearUnreadFor(userId) {
   setUnreadBadge(userId, 0);
 }
 
+// ── Групи ═══════════════════════════════════════════════════════
+async function loadGroups() {
+  const { data, error } = await getMyGroups(state.currentUser.id);
+  const container = document.getElementById("groupsList");
+  if (error || !data) {
+    container.innerHTML = `<div class="no-friends">Няма групи още</div>`;
+    return;
+  }
+
+  myGroups = {};
+  data.forEach((row) => {
+    if (row.groups) myGroups[row.groups.id] = { ...row.groups, role: row.role };
+  });
+
+  const groupList = Object.values(myGroups);
+  if (!groupList.length) {
+    container.innerHTML = `<div class="no-friends">Няма групи още.<br/>Направи една с бутона +</div>`;
+  } else {
+    container.innerHTML = groupList
+      .map((g) => {
+        const unread = unreadByGroup[g.id] || 0;
+        const badge = unread
+          ? `<span class="unread-badge">${unread > 9 ? "9+" : unread}</span>`
+          : "";
+        return `
+        <div class="user" id="group-${g.id}" onclick="selectGroup('${g.id}')">
+          <div class="group-avatar-icon">👥</div>
+          <div class="user-info">
+            <div class="user-name">${escapeHtml(g.name)}</div>
+            <div class="user-hint">Групов чат</div>
+          </div>
+          ${badge}
+        </div>
+      `;
+      })
+      .join("");
+  }
+
+  // Пренасочи глобалния абонамент за групови известия към актуалния списък групи
+  if (incomingGroupChannel) unsubscribe(incomingGroupChannel);
+  const groupIds = Object.keys(myGroups);
+  incomingGroupChannel = subscribeToAllIncomingGroupMessages(
+    groupIds,
+    handleIncomingGroupMessage,
+  );
+}
+
+function setGroupUnreadBadge(groupId, count) {
+  const el = document.querySelector(`#group-${groupId} .unread-badge`);
+  if (count <= 0) {
+    if (el) el.remove();
+    return;
+  }
+  const text = count > 9 ? "9+" : String(count);
+  if (el) {
+    el.textContent = text;
+  } else {
+    const groupEl = document.getElementById(`group-${groupId}`);
+    if (groupEl) {
+      const span = document.createElement("span");
+      span.className = "unread-badge";
+      span.textContent = text;
+      groupEl.appendChild(span);
+    }
+  }
+}
+
+function markGroupUnread(groupId) {
+  unreadByGroup[groupId] = (unreadByGroup[groupId] || 0) + 1;
+  setGroupUnreadBadge(groupId, unreadByGroup[groupId]);
+}
+
+function clearGroupUnreadFor(groupId) {
+  if (!unreadByGroup[groupId]) return;
+  delete unreadByGroup[groupId];
+  setGroupUnreadBadge(groupId, 0);
+}
+
+// ── Създаване на нова група ─────────────────────────────────────
+window.openCreateGroupModal = async function () {
+  document.getElementById("groupNameInput").value = "";
+  document.getElementById("createGroupModal").style.display = "flex";
+
+  const { data } = await getFriends(state.currentUser.id);
+  const checklist = document.getElementById("groupMemberChecklist");
+  if (!data || !data.length) {
+    checklist.innerHTML = `<div class="group-member-checklist-empty">Нямаш приятели за добавяне още</div>`;
+    return;
+  }
+
+  checklist.innerHTML = data
+    .map((f) => {
+      const friend =
+        f.sender_id === state.currentUser.id ? f.receiver : f.sender;
+      const name = getDisplayName(friend);
+      return `
+      <label class="group-member-checklist-item">
+        <input type="checkbox" value="${friend.id}" />
+        ${renderAvatar(friend, 26)}
+        <span class="group-member-checklist-name">${escapeHtml(name)}</span>
+      </label>
+    `;
+    })
+    .join("");
+};
+
+window.closeCreateGroupModal = function () {
+  document.getElementById("createGroupModal").style.display = "none";
+};
+
+window.submitCreateGroup = async function () {
+  const name = document.getElementById("groupNameInput").value.trim();
+  if (!name) {
+    showToast("error", "Грешка", "Въведи име на групата");
+    return;
+  }
+
+  const selectedIds = Array.from(
+    document.querySelectorAll("#groupMemberChecklist input:checked"),
+  ).map((el) => el.value);
+
+  const btn = document.getElementById("createGroupBtn");
+  btn.classList.add("loading");
+
+  const { data: group, error } = await createGroup(name, state.currentUser.id);
+  if (error || !group) {
+    showToast("error", "Грешка", "Не можах да създам групата");
+    btn.classList.remove("loading");
+    return;
+  }
+
+  // Създателят става admin член
+  const { error: adminError } = await addGroupMember(
+    group.id,
+    state.currentUser.id,
+    "admin",
+  );
+  if (adminError) {
+    console.error("addGroupMember (admin) error:", adminError);
+    showToast(
+      "error",
+      "Грешка",
+      adminError.message || "Не можах да те добавя в групата",
+    );
+    btn.classList.remove("loading");
+    return;
+  }
+
+  // Добави избраните приятели като обикновени членове
+  for (const friendId of selectedIds) {
+    const { error: memberError } = await addGroupMember(
+      group.id,
+      friendId,
+      "member",
+    );
+    if (memberError) {
+      console.error("addGroupMember (member) error:", memberError);
+      showToast(
+        "error",
+        "Част от поканите не минаха",
+        memberError.message || "Провери конзолата за детайли",
+      );
+    }
+  }
+
+  btn.classList.remove("loading");
+  closeCreateGroupModal();
+  showToast("success", "Групата е създадена!", "");
+  await loadGroups();
+  window.selectGroup(group.id);
+};
+
+// ── Отваряне на групов чат ──────────────────────────────────────
+window.selectGroup = async function (groupId) {
+  if (mediaRecorder) window.cancelVoiceRecording();
+
+  unsubscribe(activeChannel);
+  activeChannel = null;
+  unsubscribe(typingChannel);
+  typingChannel = null;
+
+  state.selectedGroup = groupId;
+  state.selectedUser = null;
+  closeSidebar();
+  togglePicker(false);
+  closeAttachMenu();
+  clearGroupUnreadFor(groupId);
+  document.getElementById("typingIndicator").style.display = "none";
+
+  document
+    .querySelectorAll(".user")
+    .forEach((el) => el.classList.remove("active"));
+  document.getElementById(`group-${groupId}`)?.classList.add("active");
+
+  document.getElementById("emptyState").style.display = "none";
+  document.getElementById("activeChat").style.display = "flex";
+
+  const group = myGroups[groupId];
+  document.getElementById("chatName").textContent = group?.name || "Група";
+  document.getElementById("chatHeaderAvatar").innerHTML =
+    `<div class="group-avatar-icon">👥</div>`;
+
+  const { data: members } = await getGroupMembers(groupId);
+  groupMemberProfiles[groupId] = {};
+  (members || []).forEach((m) => {
+    if (m.profiles) groupMemberProfiles[groupId][m.user_id] = m.profiles;
+  });
+  document.getElementById("chatHeaderSub").textContent =
+    `${members?.length || 0} членове`;
+
+  const { data, error } = await getGroupMessages(groupId);
+  if (error) {
+    showToast("error", "Грешка", "Не можах да заредя съобщенията");
+    return;
+  }
+
+  state.messages = data || [];
+  stickToBottom = true;
+
+  reactionsByMessage = {};
+  const messageIds = state.messages.map((m) => m.id);
+  const { data: reactionsData } = await getReactionsForMessages(messageIds);
+  (reactionsData || []).forEach((r) => {
+    (reactionsByMessage[r.message_id] ||= []).push(r);
+  });
+
+  renderMessages();
+  scrollToBottomRobust();
+
+  activeChannel = subscribeToGroupConversation(
+    groupId,
+    (msg) => {
+      if (state.messages.some((m) => m.id === msg.id)) return;
+      state.messages.push(msg);
+      renderMessages();
+      scrollToBottomRobust();
+    },
+    (updated) => {
+      const idx = state.messages.findIndex((m) => m.id === updated.id);
+      if (idx === -1) return;
+      if (updated.deleted_at) {
+        state.messages.splice(idx, 1);
+      } else {
+        state.messages[idx] = updated;
+      }
+      renderMessages();
+    },
+  );
+};
+
+// ── Обработка на входящо групово съобщение (известия/бадж) ──────
+function handleIncomingGroupMessage(msg) {
+  const isOpenGroup = state.selectedGroup === msg.group_id;
+  const tabActive = isTabActive();
+
+  if (isOpenGroup && tabActive) return;
+  // Собствените ни съобщения идват и по този канал (широк филтър) —
+  // не известявай за нещо, което ние самите изпратихме.
+  if (msg.sender_id === state.currentUser.id) return;
+
+  const group = myGroups[msg.group_id];
+  const groupName = group?.name || "Групов чат";
+  const senderProfile = groupMemberProfiles[msg.group_id]?.[msg.sender_id];
+  const senderName = senderProfile ? getDisplayName(senderProfile) : "";
+  const preview = msg.image_url
+    ? "📷 Снимка"
+    : msg.audio_url
+      ? "🎙️ Гласово съобщение"
+      : msg.content || "";
+  const body = senderName ? `${senderName}: ${preview}` : preview;
+
+  if (!tabActive) {
+    showBrowserNotification({
+      title: groupName,
+      body,
+      icon: group?.avatar_url,
+      onClick: () => window.selectGroup(msg.group_id),
+    });
+    playNotifySound();
+    flashTitle(groupName);
+  } else {
+    showToast("info", groupName, body || "Ново съобщение");
+  }
+
+  if (!isOpenGroup) markGroupUnread(msg.group_id);
+}
+
+// ── Групова инфо/членове ─────────────────────────────────────────
+window.openGroupInfo = async function () {
+  const groupId = state.selectedGroup;
+  if (!groupId) return;
+
+  const group = myGroups[groupId];
+  document.getElementById("groupInfoName").textContent = group?.name || "Група";
+  document.getElementById("groupRenameInput").value = group?.name || "";
+
+  const { data: members } = await getGroupMembers(groupId);
+  const myRole = members?.find((m) => m.user_id === state.currentUser.id)?.role;
+  const isAdmin = myRole === "admin";
+
+  document.getElementById("groupRenameField").style.display = isAdmin
+    ? "flex"
+    : "none";
+  document.getElementById("groupAddFriendField").style.display = isAdmin
+    ? "flex"
+    : "none";
+
+  const membersListEl = document.getElementById("groupMembersList");
+  membersListEl.innerHTML = (members || [])
+    .map((m) => {
+      const profile = m.profiles || { id: m.user_id, email: "" };
+      const name = getDisplayName(profile);
+      const canRemove = isAdmin && m.user_id !== state.currentUser.id;
+      return `
+      <div class="group-member-row">
+        ${renderAvatar(profile, 28)}
+        <div class="group-member-row-name">${escapeHtml(name)}</div>
+        <div class="group-member-role">${m.role === "admin" ? "админ" : ""}</div>
+        ${
+          canRemove
+            ? `<button class="group-member-remove" onclick="handleRemoveGroupMember('${groupId}', '${m.user_id}')">✕</button>`
+            : ""
+        }
+      </div>
+    `;
+    })
+    .join("");
+
+  if (isAdmin) {
+    const memberIds = new Set((members || []).map((m) => m.user_id));
+    const { data: friendsData } = await getFriends(state.currentUser.id);
+    const addable = (friendsData || [])
+      .map((f) =>
+        f.sender_id === state.currentUser.id ? f.receiver : f.sender,
+      )
+      .filter((f) => !memberIds.has(f.id));
+
+    const addChecklist = document.getElementById("groupAddFriendChecklist");
+    if (!addable.length) {
+      addChecklist.innerHTML = `<div class="group-member-checklist-empty">Всичките ти приятели вече са в групата</div>`;
+    } else {
+      addChecklist.innerHTML = addable
+        .map(
+          (f) => `
+        <label class="group-member-checklist-item">
+          <input type="checkbox" value="${f.id}" />
+          ${renderAvatar(f, 26)}
+          <span class="group-member-checklist-name">${escapeHtml(getDisplayName(f))}</span>
+        </label>
+      `,
+        )
+        .join("");
+    }
+  }
+
+  document.getElementById("groupInfoModal").style.display = "flex";
+};
+
+window.closeGroupInfo = function () {
+  document.getElementById("groupInfoModal").style.display = "none";
+};
+
+window.saveGroupInfo = async function () {
+  const groupId = state.selectedGroup;
+  if (!groupId) return;
+
+  const btn = document.getElementById("groupInfoSaveBtn");
+  btn.classList.add("loading");
+
+  const newName = document.getElementById("groupRenameInput").value.trim();
+  if (newName && newName !== myGroups[groupId]?.name) {
+    const { error } = await renameGroup(groupId, newName);
+    if (!error) {
+      myGroups[groupId].name = newName;
+      document.getElementById("chatName").textContent = newName;
+    }
+  }
+
+  const selectedIds = Array.from(
+    document.querySelectorAll("#groupAddFriendChecklist input:checked"),
+  ).map((el) => el.value);
+  for (const friendId of selectedIds) {
+    const { error: memberError } = await addGroupMember(
+      groupId,
+      friendId,
+      "member",
+    );
+    if (memberError) {
+      console.error("addGroupMember error:", memberError);
+      showToast(
+        "error",
+        "Част от поканите не минаха",
+        memberError.message || "Провери конзолата за детайли",
+      );
+    }
+  }
+
+  btn.classList.remove("loading");
+  showToast("success", "Готово!", "Промените са запазени");
+  closeGroupInfo();
+  await loadGroups();
+  if (state.selectedGroup === groupId) window.selectGroup(groupId);
+};
+
+window.handleRemoveGroupMember = async function (groupId, userId) {
+  const confirmed = confirm("Сигурен ли си, че искаш да махнеш този човек?");
+  if (!confirmed) return;
+
+  const { error } = await removeGroupMember(groupId, userId);
+  if (error) {
+    showToast("error", "Грешка", "Не можах да махна члена");
+    return;
+  }
+  showToast("success", "Готово", "Членът беше премахнат");
+  openGroupInfo();
+};
+
+window.handleLeaveGroup = async function () {
+  const groupId = state.selectedGroup;
+  if (!groupId) return;
+
+  const confirmed = confirm("Сигурен ли си, че искаш да напуснеш групата?");
+  if (!confirmed) return;
+
+  const { error } = await leaveGroup(groupId, state.currentUser.id);
+  if (error) {
+    showToast("error", "Грешка", "Не можах да напусна групата");
+    return;
+  }
+
+  closeGroupInfo();
+  state.selectedGroup = null;
+  unsubscribe(activeChannel);
+  activeChannel = null;
+  document.getElementById("activeChat").style.display = "none";
+  document.getElementById("emptyState").style.display = "flex";
+  showToast("info", "Напусна групата", "");
+  await loadGroups();
+};
+
 // ── Pending invites ───────────────────────────────────────────
 async function loadPendingInvites() {
   const { data, error } = await getPendingInvites(state.currentUser.id);
@@ -844,6 +1307,7 @@ window.selectUser = async function (id) {
   activeChannel = null;
 
   state.selectedUser = id;
+  state.selectedGroup = null;
   closeSidebar();
   togglePicker(false);
   closeAttachMenu();
@@ -928,17 +1392,16 @@ window.selectUser = async function (id) {
 window.sendMessage = async function () {
   const input = document.getElementById("msgInput");
   const content = input.value.trim();
-  if (!content || !state.selectedUser) return;
+  if (!content || (!state.selectedUser && !state.selectedGroup)) return;
 
   input.value = "";
   trackTyping(false);
   clearTimeout(typingTimeout);
 
-  const { data, error } = await sendMessage(
-    state.currentUser.id,
-    state.selectedUser,
-    content,
-  );
+  const { data, error } = state.selectedGroup
+    ? await sendGroupMessage(state.currentUser.id, state.selectedGroup, content)
+    : await sendMessage(state.currentUser.id, state.selectedUser, content);
+
   if (error) {
     const t = friendlyError(error, "Грешка", "Съобщението не беше изпратено");
     showToast("error", t.title, t.msg);
@@ -955,7 +1418,7 @@ window.sendMessage = async function () {
 // ── Image upload ──────────────────────────────────────────────
 window.handleImageUpload = async function (event) {
   const file = event.target.files[0];
-  if (!file || !state.selectedUser) return;
+  if (!file || (!state.selectedUser && !state.selectedGroup)) return;
   event.target.value = "";
 
   if (file.size > 5 * 1024 * 1024) {
@@ -976,11 +1439,13 @@ window.handleImageUpload = async function (event) {
     return;
   }
 
-  const { data, error } = await sendImageMessage(
-    state.currentUser.id,
-    state.selectedUser,
-    url,
-  );
+  const { data, error } = state.selectedGroup
+    ? await sendGroupImageMessage(
+        state.currentUser.id,
+        state.selectedGroup,
+        url,
+      )
+    : await sendImageMessage(state.currentUser.id, state.selectedUser, url);
   imgBtn.classList.remove("loading");
   if (error) {
     const t = friendlyError(error, "Грешка", "Съобщението не беше записано");
@@ -1019,7 +1484,7 @@ function formatDuration(totalSeconds) {
 }
 
 window.startVoiceRecording = async function () {
-  if (!state.selectedUser) return;
+  if (!state.selectedUser && !state.selectedGroup) return;
   if (mediaRecorder && mediaRecorder.state === "recording") return;
 
   if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
@@ -1112,7 +1577,7 @@ window.stopAndSendVoiceRecording = function () {
 };
 
 async function sendVoiceBlob(blob, durationSeconds) {
-  if (!state.selectedUser) return;
+  if (!state.selectedUser && !state.selectedGroup) return;
 
   const micBtn = document.getElementById("micBtn");
   micBtn?.classList.add("loading");
@@ -1131,12 +1596,19 @@ async function sendVoiceBlob(blob, durationSeconds) {
     return;
   }
 
-  const { data, error } = await sendVoiceMessage(
-    state.currentUser.id,
-    state.selectedUser,
-    url,
-    durationSeconds,
-  );
+  const { data, error } = state.selectedGroup
+    ? await sendGroupVoiceMessage(
+        state.currentUser.id,
+        state.selectedGroup,
+        url,
+        durationSeconds,
+      )
+    : await sendVoiceMessage(
+        state.currentUser.id,
+        state.selectedUser,
+        url,
+        durationSeconds,
+      );
   micBtn?.classList.remove("loading");
   if (error) {
     const t = friendlyError(error, "Грешка", "Съобщението не беше записано");
@@ -1245,19 +1717,31 @@ function renderMessages() {
   const container = document.getElementById("messages");
   const me = state.currentProfile;
   const friend = state.currentFriendProfile;
+  const isGroupChat = !!state.selectedGroup;
 
   container.innerHTML = state.messages
     .map((m) => {
       const isMine = m.sender_id === state.currentUser.id;
-      const profile = isMine ? me : friend;
+      const groupSenderProfile = isGroupChat
+        ? groupMemberProfiles[m.group_id]?.[m.sender_id]
+        : null;
+      const profile = isMine ? me : isGroupChat ? groupSenderProfile : friend;
       const color = isMine ? "var(--accent)" : getColor(m.sender_id);
       const name = isMine
         ? me.display_name || me.email
-        : getDisplayName(friend || { id: m.sender_id, email: "" });
+        : isGroupChat
+          ? getDisplayName(groupSenderProfile || { id: m.sender_id, email: "" })
+          : getDisplayName(friend || { id: m.sender_id, email: "" });
 
       const avatarHtml = profile?.avatar_url
         ? `<img src="${profile.avatar_url}" style="width:26px;height:26px;border-radius:50%;object-fit:cover;flex-shrink:0;opacity:0.8;align-self:flex-end" />`
         : `<div class="msg-avatar" style="background:${color}22;color:${color}">${initials(name)}</div>`;
+
+      // В групов чат — покажи име на подателя над чуждите съобщения
+      const senderLabel =
+        isGroupChat && !isMine
+          ? `<div class="msg-sender-name" style="color:${color}">${escapeHtml(name)}</div>`
+          : "";
 
       const bubbleContent = m.image_url
         ? `<img src="${m.image_url}" class="msg-image" onclick="openImage('${m.image_url}')" />`
@@ -1282,12 +1766,15 @@ function renderMessages() {
         ? `<span class="msg-edited">· редактирано</span>`
         : "";
 
-      const ticksHtml = isMine ? renderStatusTicks(m) : "";
+      // "Прочетено"/"доставено" отметки — само за 1-на-1 (в групи няма
+      // индивидуално проследяване по член в тази версия).
+      const ticksHtml = isMine && !m.group_id ? renderStatusTicks(m) : "";
 
       return `
       <div class="msg-row ${isMine ? "mine" : ""}" data-msg-id="${m.id}">
         ${avatarHtml}
         <div class="msg-content-wrapper">
+          ${senderLabel}
           <div class="msg-bubble ${m.image_url ? "image-bubble" : ""} ${m.audio_url ? "voice-bubble" : ""}">
             ${bubbleContent}
           </div>

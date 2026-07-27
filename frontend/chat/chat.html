@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Чатче</title>
+    <link rel="icon" type="image/png" href="/assets/favicon.png" />
     <link rel="stylesheet" href="chat.css" />
     <link rel="stylesheet" href="../shared/toast.css" />
     <link rel="stylesheet" href="../shared/profile-modal.css" />
@@ -141,6 +142,86 @@
       </div>
     </div>
 
+    <!-- ── Create Group Modal ── -->
+    <div
+      class="modal-overlay"
+      id="createGroupModal"
+      style="display: none"
+      onclick="if (event.target === this) closeCreateGroupModal();"
+    >
+      <div class="modal">
+        <div class="modal-header">
+          <div class="modal-title">Нова група</div>
+          <button class="modal-close" onclick="closeCreateGroupModal()">
+            ✕
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="modal-field">
+            <label class="form-label">Име на групата</label>
+            <input
+              id="groupNameInput"
+              type="text"
+              placeholder="напр. Приятели от работа"
+              autocomplete="off"
+            />
+          </div>
+          <div class="modal-field">
+            <label class="form-label">Избери членове (от приятелите ти)</label>
+            <div id="groupMemberChecklist" class="group-member-checklist"></div>
+          </div>
+          <div class="modal-actions">
+            <button class="btn-secondary" onclick="closeCreateGroupModal()">
+              Откажи
+            </button>
+            <button id="createGroupBtn" onclick="submitCreateGroup()">
+              Създай →
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Group Info Modal ── -->
+    <div
+      class="modal-overlay"
+      id="groupInfoModal"
+      style="display: none"
+      onclick="if (event.target === this) closeGroupInfo();"
+    >
+      <div class="modal">
+        <div class="modal-header">
+          <div class="modal-title" id="groupInfoName">Група</div>
+          <button class="modal-close" onclick="closeGroupInfo()">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="modal-field" id="groupRenameField">
+            <label class="form-label">Име на групата</label>
+            <input id="groupRenameInput" type="text" autocomplete="off" />
+          </div>
+          <div class="modal-field">
+            <label class="form-label">Членове</label>
+            <div id="groupMembersList"></div>
+          </div>
+          <div class="modal-field" id="groupAddFriendField">
+            <label class="form-label">Добави приятел</label>
+            <div
+              id="groupAddFriendChecklist"
+              class="group-member-checklist"
+            ></div>
+          </div>
+          <div class="modal-actions">
+            <button class="btn-secondary" onclick="handleLeaveGroup()">
+              Напусни групата
+            </button>
+            <button id="groupInfoSaveBtn" onclick="saveGroupInfo()">
+              Запази →
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="layout">
       <!-- SIDEBAR -->
       <div class="sidebar" id="sidebar">
@@ -233,6 +314,42 @@
         <div class="users-list" id="users"></div>
 
         <div
+          class="sidebar-section"
+          style="
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+          "
+        >
+          <span>Групи</span>
+          <button
+            class="icon-btn"
+            onclick="openCreateGroupModal()"
+            title="Нова група"
+            style="width: 22px; height: 22px"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+          </button>
+        </div>
+        <div
+          class="users-list"
+          id="groupsList"
+          style="flex: 0 0 auto; max-height: 40%"
+        ></div>
+
+        <div
           class="sidebar-footer"
           onclick="openProfileSettings(false)"
           style="cursor: pointer"
@@ -320,7 +437,9 @@
             </div>
             <button
               class="icon-btn"
-              onclick="openRenameContact()"
+              onclick="
+                state.selectedGroup ? openGroupInfo() : openRenameContact()
+              "
               title="Преименувай контакт"
             >
               <svg

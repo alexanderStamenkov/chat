@@ -846,6 +846,102 @@ input#msgInput::placeholder {
   font-variant-numeric: tabular-nums;
 }
 
+/* ── Групи ── */
+.group-member-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px;
+}
+.group-member-checklist-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.group-member-checklist-item:hover {
+  background: var(--surface2);
+}
+.group-member-checklist-item input {
+  width: auto;
+  accent-color: var(--accent);
+}
+.group-member-checklist-name {
+  font-size: 13px;
+  color: var(--text);
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.group-member-checklist-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 10px;
+}
+
+.group-member-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px;
+  border-radius: 8px;
+}
+.group-member-row-name {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-soft);
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.group-member-role {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.group-member-remove {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  margin: 0;
+  width: auto;
+}
+.group-member-remove:hover {
+  color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.1);
+  transform: none;
+  box-shadow: none;
+}
+
+.group-avatar-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  flex-shrink: 0;
+  background: rgba(200, 240, 96, 0.12);
+  color: var(--accent);
+}
+
 /* ── Toast (shared styles) ── */
 .toast-container {
   position: fixed;
@@ -1293,6 +1389,13 @@ input#msgInput::placeholder {
   align-items: flex-end;
 }
 
+.msg-sender-name {
+  font-size: 11px;
+  font-weight: 700;
+  font-family: "Syne", sans-serif;
+  margin: 0 2px 2px;
+}
+
 /* ── Реакции с емоджита ── */
 .msg-react-btn {
   background: none;
@@ -1408,39 +1511,4 @@ input#msgInput::placeholder {
   .msg-menu-btn {
     opacity: 1;
   }
-}
-
-#picker-container .picmo__picker {
-  --background-color: #18181c;
-  --secondary-background-color: #222228;
-  --border-color: rgba(255, 255, 255, 0.07);
-  --text-color: #f0f0f2;
-  --secondary-text-color: #888894;
-  --hover-background-color: #222228;
-  --focus-indicator-color: #c8f060;
-  --category-tab-active-indicator-color: #c8f060;
-  --search-background-color: #111113;
-  --search-focus-background-color: #111113;
-  --search-placeholder-color: #55555f;
-  --tag-background-color: #222228;
-  --category-name-background-color: #18181c;
-  --category-name-text-color: #55555f;
-  --scrollbar-color: #222228;
-  --scrollbar-thumb-color: #333340;
-  border-radius: 12px;
-}
-
-#picker-container .picmo__picker * {
-  scrollbar-color: #333340 #18181c;
-  scrollbar-width: thin;
-}
-#picker-container .picmo__picker *::-webkit-scrollbar {
-  width: 4px;
-}
-#picker-container .picmo__picker *::-webkit-scrollbar-track {
-  background: #18181c;
-}
-#picker-container .picmo__picker *::-webkit-scrollbar-thumb {
-  background: #333340;
-  border-radius: 2px;
 }

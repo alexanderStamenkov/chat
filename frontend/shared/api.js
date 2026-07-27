@@ -425,3 +425,161 @@ export function createOnlineChannel(userId, onStatusChange) {
 
   return channel;
 }
+
+// ── Групи ═══════════════════════════════════════════════════════
+export async function createGroup(name, creatorId) {
+  return sb
+    .from("groups")
+    .insert({ name, created_by: creatorId })
+    .select()
+    .single();
+}
+
+export async function addGroupMember(groupId, userId, role = "member") {
+  return sb
+    .from("group_members")
+    .insert({ group_id: groupId, user_id: userId, role });
+}
+
+export async function getMyGroups(userId) {
+  return sb
+    .from("group_members")
+    .select(
+      "group_id, role, groups(id, name, avatar_url, created_by, created_at)",
+    )
+    .eq("user_id", userId);
+}
+
+export async function getGroupMembers(groupId) {
+  return sb
+    .from("group_members")
+    .select(
+      "user_id, role, joined_at, profiles(id, email, display_name, avatar_url)",
+    )
+    .eq("group_id", groupId);
+}
+
+export async function leaveGroup(groupId, userId) {
+  return sb
+    .from("group_members")
+    .delete()
+    .eq("group_id", groupId)
+    .eq("user_id", userId);
+}
+
+export async function removeGroupMember(groupId, userId) {
+  return sb
+    .from("group_members")
+    .delete()
+    .eq("group_id", groupId)
+    .eq("user_id", userId);
+}
+
+export async function renameGroup(groupId, name) {
+  return sb.from("groups").update({ name }).eq("id", groupId).select().single();
+}
+
+// ── Групови съобщения ────────────────────────────────────────
+export async function getGroupMessages(groupId) {
+  return sb
+    .from("messages")
+    .select("*")
+    .eq("group_id", groupId)
+    .is("deleted_at", null)
+    .order("created_at");
+}
+
+export async function sendGroupMessage(senderId, groupId, content) {
+  return sb
+    .from("messages")
+    .insert({
+      sender_id: senderId,
+      group_id: groupId,
+      receiver_id: null,
+      content,
+    })
+    .select()
+    .single();
+}
+
+export async function sendGroupImageMessage(senderId, groupId, imageUrl) {
+  return sb
+    .from("messages")
+    .insert({
+      sender_id: senderId,
+      group_id: groupId,
+      receiver_id: null,
+      content: null,
+      image_url: imageUrl,
+    })
+    .select()
+    .single();
+}
+
+export async function sendGroupVoiceMessage(
+  senderId,
+  groupId,
+  audioUrl,
+  durationSeconds,
+) {
+  return sb
+    .from("messages")
+    .insert({
+      sender_id: senderId,
+      group_id: groupId,
+      receiver_id: null,
+      content: null,
+      audio_url: audioUrl,
+      audio_duration: durationSeconds,
+    })
+    .select()
+    .single();
+}
+
+// ── Realtime: групов разговор (за отворения групов чат) ─────────
+export function subscribeToGroupConversation(groupId, onInsert, onUpdate) {
+  const channel = sb.channel(`group-conversation:${groupId}`);
+
+  channel.on(
+    "postgres_changes",
+    {
+      event: "INSERT",
+      schema: "public",
+      table: "messages",
+      filter: `group_id=eq.${groupId}`,
+    },
+    (payload) => onInsert(payload.new),
+  );
+
+  channel.on(
+    "postgres_changes",
+    {
+      event: "UPDATE",
+      schema: "public",
+      table: "messages",
+      filter: `group_id=eq.${groupId}`,
+    },
+    (payload) => onUpdate?.(payload.new),
+  );
+
+  return channel.subscribe();
+}
+
+// ── Realtime: входящи групови съобщения (за известия, независимо
+// от отворения чат) — филтрирано по всичките ти групи наведнъж.
+export function subscribeToAllIncomingGroupMessages(groupIds, onMessage) {
+  if (!groupIds?.length) return null;
+  return sb
+    .channel("incoming-group-messages")
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "messages",
+        filter: `group_id=in.(${groupIds.join(",")})`,
+      },
+      (payload) => onMessage(payload.new),
+    )
+    .subscribe();
+}

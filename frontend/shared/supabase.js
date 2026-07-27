@@ -1,15 +1,13 @@
 import { createClient } from "@supabase/supabase-js";
-// временно добави в supabase.js горе
-console.log(import.meta.env.VITE_SUPABASE_URL);
+
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY;
 
-const PROD_TURNSTILE_SITE_KEY = import.meta.env.PROD_TURNSTILE_SITE_KEY;
-const TEST_TURNSTILE_SITE_KEY = import.meta.env.TEST_TURNSTILE_SITE_KEY;
+export const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-export const sb = createClient(
-  SUPABASE_URL,
-  SUPABASE_KEY,
-  PROD_TURNSTILE_SITE_KEY,
-  TEST_TURNSTILE_SITE_KEY,
-);
+// ── Cloudflare Turnstile ──────────────────────────────────────
+// Публични sitekeys (безопасни за клиента) — идват от .env, за да не
+// стоят hardcode-нати в кода. Тайният ключ НЕ живее тук — той е само
+// в Supabase Dashboard → Authentication → Attack Protection.
+export const TURNSTILE_PROD_KEY = import.meta.env.VITE_TURNSTILE_PROD_KEY;
+export const TURNSTILE_TEST_KEY = import.meta.env.VITE_TURNSTILE_TEST_KEY;
