@@ -70,8 +70,6 @@ Here are the features currently in development or planned for future releases:
 
 [ ] Push Notifications: Native push alerts using Service Workers (Supabase Edge Function send-push infrastructure is underway).
 
-[ ] Group Chats: Expand from 1-on-1 messaging to multi-user group channels.
-
 [ ] Chat History Search: Quick text search inside message histories.
 
 [ ] Pagination & Lazy Loading: Optimize performance for long chat histories.
