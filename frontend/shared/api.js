@@ -235,20 +235,12 @@ export async function uploadImage(userId, file) {
 }
 
 // ── Auth ──────────────────────────────────────────────────────
-export async function login(email, password, captchaToken) {
-  return sb.auth.signInWithPassword({
-    email,
-    password,
-    options: captchaToken ? { captchaToken } : undefined,
-  });
+export async function login(email, password) {
+  return sb.auth.signInWithPassword({ email, password });
 }
 
-export async function register(email, password, captchaToken) {
-  return sb.auth.signUp({
-    email,
-    password,
-    options: captchaToken ? { captchaToken } : undefined,
-  });
+export async function register(email, password) {
+  return sb.auth.signUp({ email, password });
 }
 
 export async function loginWithGoogle(redirectTo) {

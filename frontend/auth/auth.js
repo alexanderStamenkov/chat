@@ -5,49 +5,11 @@ import {
   loginWithGoogle,
   upsertProfile,
 } from "../shared/api.js";
-import { TURNSTILE_PROD_KEY, TURNSTILE_TEST_KEY } from "../shared/supabase.js";
 import { showToast } from "../shared/toast.js";
 
 let currentTab = "login";
 
-const PROD_TURNSTILE_SITE_KEY = TURNSTILE_PROD_KEY;
-const TEST_TURNSTILE_SITE_KEY = TURNSTILE_TEST_KEY;
-
-const isLocalDev =
-  location.hostname === "localhost" ||
-  location.hostname === "127.0.0.1" ||
-  location.hostname === "[::1]";
-
-const TURNSTILE_SITE_KEY = isLocalDev
-  ? TEST_TURNSTILE_SITE_KEY
-  : PROD_TURNSTILE_SITE_KEY;
-
-let turnstileLoginWidgetId = null;
-let turnstileRegisterWidgetId = null;
-
-function renderTurnstileWidgets() {
-  if (!window.turnstile) {
-    // Скриптът още не се е зареждил — опитай пак малко по-късно.
-    setTimeout(renderTurnstileWidgets, 200);
-    return;
-  }
-  if (turnstileLoginWidgetId === null) {
-    turnstileLoginWidgetId = turnstile.render("#turnstileLogin", {
-      sitekey: TURNSTILE_SITE_KEY,
-      appearance: "interaction-only",
-    });
-  }
-  if (turnstileRegisterWidgetId === null) {
-    turnstileRegisterWidgetId = turnstile.render("#turnstileRegister", {
-      sitekey: TURNSTILE_SITE_KEY,
-      appearance: "interaction-only",
-    });
-  }
-}
-
 document.addEventListener("DOMContentLoaded", async () => {
-  renderTurnstileWidgets();
-
   const { data } = await getSession();
   if (data.session) {
     window.location.href = "../chat/chat.html";
@@ -82,16 +44,9 @@ window.handleLogin = async function () {
     return;
   }
 
-  const captchaToken = window.turnstile?.getResponse(turnstileLoginWidgetId);
-  if (!captchaToken) {
-    showToast("error", "Провери, че не си бот", "Довърши проверката отгоре");
-    return;
-  }
-
   btn.classList.add("loading");
-  const { data, error } = await login(email, password, captchaToken);
+  const { data, error } = await login(email, password);
   btn.classList.remove("loading");
-  window.turnstile?.reset(turnstileLoginWidgetId);
 
   if (error) {
     showToast("error", "Грешка при вход", error.message);
@@ -126,16 +81,9 @@ window.handleRegister = async function () {
     return;
   }
 
-  const captchaToken = window.turnstile?.getResponse(turnstileRegisterWidgetId);
-  if (!captchaToken) {
-    showToast("error", "Провери, че не си бот", "Довърши проверката отгоре");
-    return;
-  }
-
   btn.classList.add("loading");
-  const { error } = await register(email, password, captchaToken);
+  const { error } = await register(email, password);
   btn.classList.remove("loading");
-  window.turnstile?.reset(turnstileRegisterWidgetId);
 
   if (error) {
     showToast("error", "Грешка при регистрация", error.message);
