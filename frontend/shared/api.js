@@ -419,11 +419,12 @@ export function createOnlineChannel(userId, onStatusChange) {
 }
 
 // ── Групи ═══════════════════════════════════════════════════════
-export async function createGroup(name, creatorId) {
+export async function createGroup(name, memberIds = []) {
   return sb
-    .from("groups")
-    .insert({ name, created_by: creatorId })
-    .select()
+    .rpc("create_group_with_members", {
+      p_name: name,
+      p_member_ids: memberIds,
+    })
     .single();
 }
 
@@ -574,4 +575,8 @@ export function subscribeToAllIncomingGroupMessages(groupIds, onMessage) {
       (payload) => onMessage(payload.new),
     )
     .subscribe();
+}
+
+export async function deleteGroup(groupId) {
+  return sb.from("groups").delete().eq("id", groupId);
 }

@@ -21,10 +21,7 @@
       class="modal-overlay"
       id="profileModal"
       style="display: none"
-      onclick="
-        if (event.target === this && !state?.isFirstLogin)
-          closeProfileSettings();
-      "
+      onclick="handleProfileOverlayClick(event)"
     >
       <div class="modal">
         <div class="modal-header">
@@ -32,6 +29,7 @@
             <div class="modal-title">Твоят профил</div>
             <div class="modal-subtitle">Как да те виждат другите</div>
           </div>
+
           <button
             class="modal-close"
             id="profileModalClose"
@@ -40,10 +38,12 @@
             ✕
           </button>
         </div>
+
         <div class="modal-body">
           <div id="firstLoginBanner" class="modal-banner" style="display: none">
-            👋 Добре дошъл! <strong>Добави снимка и име</strong><br />за да те
-            разпознаят приятелите ти.
+            👋 Добре дошъл!
+            <strong>Добави снимка и име</strong><br />
+            за да те разпознаят приятелите ти.
           </div>
 
           <div class="avatar-section">
@@ -52,6 +52,7 @@
               onclick="document.getElementById('profileAvatarInput').click()"
             >
               <img id="profileAvatarPreview" style="display: none" />
+
               <div class="avatar-upload-placeholder" id="avatarPlaceholder">
                 <svg
                   width="22"
@@ -64,10 +65,13 @@
                   <circle cx="12" cy="8" r="4" />
                   <path d="M20 21a8 8 0 1 0-16 0" />
                 </svg>
+
                 <span>Снимка</span>
               </div>
+
               <div class="avatar-upload-overlay">Смени</div>
             </div>
+
             <div class="avatar-hint">JPG, PNG · макс. 3MB</div>
           </div>
 
@@ -80,7 +84,8 @@
           />
 
           <div class="modal-field">
-            <label class="form-label">Показвано име</label>
+            <label class="form-label"> Показвано име </label>
+
             <input
               id="profileDisplayName"
               type="text"
@@ -98,6 +103,7 @@
             >
               Пропусни
             </button>
+
             <button id="saveProfileBtn" onclick="saveProfile()">
               Запази →
             </button>
@@ -192,28 +198,51 @@
       <div class="modal">
         <div class="modal-header">
           <div class="modal-title" id="groupInfoName">Група</div>
+
           <button class="modal-close" onclick="closeGroupInfo()">✕</button>
         </div>
+
         <div class="modal-body">
           <div class="modal-field" id="groupRenameField">
-            <label class="form-label">Име на групата</label>
+            <label class="form-label"> Име на групата </label>
+
             <input id="groupRenameInput" type="text" autocomplete="off" />
           </div>
+
           <div class="modal-field">
-            <label class="form-label">Членове</label>
+            <label class="form-label"> Членове </label>
+
             <div id="groupMembersList"></div>
           </div>
+
           <div class="modal-field" id="groupAddFriendField">
-            <label class="form-label">Добави приятел</label>
+            <label class="form-label"> Добави приятел </label>
+
             <div
               id="groupAddFriendChecklist"
               class="group-member-checklist"
             ></div>
           </div>
+
           <div class="modal-actions">
-            <button class="btn-secondary" onclick="handleLeaveGroup()">
+            <button
+              id="deleteGroupBtn"
+              class="btn-secondary"
+              onclick="handleDeleteGroup()"
+              style="display: none"
+            >
+              Изтрий групата
+            </button>
+
+            <button
+              id="leaveGroupBtn"
+              class="btn-secondary"
+              onclick="handleLeaveGroup()"
+              style="display: none"
+            >
               Напусни групата
             </button>
+
             <button id="groupInfoSaveBtn" onclick="saveGroupInfo()">
               Запази →
             </button>
@@ -437,9 +466,7 @@
             </div>
             <button
               class="icon-btn"
-              onclick="
-                state.selectedGroup ? openGroupInfo() : openRenameContact()
-              "
+              onclick="handleChatHeaderAction()"
               title="Преименувай контакт"
             >
               <svg
